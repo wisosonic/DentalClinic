@@ -26,11 +26,9 @@ import { useDeleteOfferMutation, useGetOfferQuery, useMarkOfferItemDoneMutation,
 
 type SortKey = 'order' | 'description' | 'procedure' | 'tooth' | 'price' | 'cost' | 'status' | 'visit';
 
-/** The buttons that apply to an offer in each state, in the order they usually happen. */
+/** The buttons that apply to an offer in each state. A new offer is accepted already; only a draft waits to be accepted. */
 const NEXT: Record<string, { action: OfferAction; label: string; primary?: boolean }[]> = {
-  draft: [{ action: 'send', label: 'Mark as sent', primary: true }, { action: 'accept', label: 'Patient accepted' }],
-  sent: [{ action: 'accept', label: 'Patient accepted', primary: true }, { action: 'reject', label: 'Rejected' }, { action: 'expire', label: 'Mark as expired' }],
-  accepted: [{ action: 'reject', label: 'Rejected' }],
+  draft: [{ action: 'accept', label: 'Patient accepted', primary: true }],
 };
 
 /**
@@ -60,8 +58,8 @@ export function OfferDetailPage() {
   const seesPayments = mayWrite; // staff record a payment but cannot browse the history
   const { data: payments } = useListPaymentsQuery({ offerId: id, pageSize: 100, sort: 'date', order: 'asc' }, { skip: !id || !seesPayments });
   const accepted = offer?.status === 'accepted';
-  const closed = !!offer && ['rejected', 'expired', 'cancelled'].includes(offer.status);
-  const canPay = !!offer && ['sent', 'accepted'].includes(offer.status) && offer.remaining > 0 && (mayWrite || role === 'staff');
+  const closed = offer?.status === 'cancelled';
+  const canPay = !!offer && offer.status === 'accepted' && offer.remaining > 0 && (mayWrite || role === 'staff');
   const failure = actState.error ?? doneState.error ?? removeState.error ?? removePaymentState.error;
   const hasCost = offer?.cost !== undefined;
   const untouched = !!offer && offer.paid === 0 && (offer.items ?? []).every((i) => i.status === 'pending');
@@ -96,7 +94,7 @@ export function OfferDetailPage() {
         }
       />
       <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-        {mayWrite && (NEXT[offer.status] ?? []).filter((n) => !(n.action === 'reject' && !untouched)).map((n) => (
+        {mayWrite && (NEXT[offer.status] ?? []).map((n) => (
           <Button key={n.action} variant={n.primary ? 'contained' : 'outlined'} onClick={() => run(n.action)} disabled={actState.isLoading}>{t(n.label)}</Button>
         ))}
         {canPay && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setPaying('new')}>{t('Record payment')}</Button>}
@@ -135,7 +133,7 @@ export function OfferDetailPage() {
       </Paper>
 
       {!accepted && !closed && (
-        <Alert severity="info" sx={{ mb: 2 }}>{t('Visits can be booked once the patient has accepted the offer.')}</Alert>
+        <Alert severity="info" sx={{ mb: 2 }}>{t('This offer is a draft. Visits and payments come once the patient has accepted it.')}</Alert>
       )}
 
       {offer.items && offer.items.length === 0 ? (

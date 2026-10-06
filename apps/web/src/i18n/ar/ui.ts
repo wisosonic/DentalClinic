@@ -253,6 +253,10 @@ export const ui: Dictionary = {
   // Visit reports
   'Visit report': 'تقرير الزيارة',
   Report: 'التقرير',
+  "Save as draft": "حفظ كمسودة",
+  "Treatment to book": "علاج بانتظار الحجز",
+  "Accepted offers with work still to book.": "عروض مقبولة لا يزال فيها عمل بانتظار الحجز.",
+  "This offer is a draft. Visits and payments come once the patient has accepted it.": "هذا العرض مسودة. تأتي الزيارات والدفعات بعد أن يقبله المريض.",
   "Back to the patient": "العودة إلى المريض",
   "Documents": "المستندات",
   "Search documents": "بحث في المستندات",

@@ -280,6 +280,21 @@ describe('migration 020: treatment plans and quotes become treatment offers', ()
     expect(await db('role_permissions').select('role', 'permission', 'allowed')).toEqual([{ role: 'doctor', permission: 'offers:delete', allowed: 0 }]); // the plans row is gone
   });
 
+  it('migration 022 turns sent offers into accepted ones and rejected or expired ones into cancelled', async () => {
+    db = await beforeOffers();
+    await db.migrate.up(migrationConfig); // 020
+    const patient = (await db('patients').first('id'))!.id as number;
+    for (const status of ['sent', 'rejected', 'expired', 'draft', 'accepted', 'cancelled']) {
+      await db('quotes').insert({ title: status, type: 'clinic', price: 10, cost: 0, currency: '$', status, patient_id: patient, ...stamp });
+    }
+    await db.migrate.latest(migrationConfig); // 021 and 022
+    const byTitle = async (title: string) => (await db!('quotes').where({ title }).first())!.status;
+    expect([await byTitle('sent'), await byTitle('rejected'), await byTitle('expired'), await byTitle('draft'), await byTitle('accepted'), await byTitle('cancelled')])
+      .toEqual(['accepted', 'cancelled', 'cancelled', 'draft', 'accepted', 'cancelled']);
+    expect(await db('quotes').where({ title: 'Bridge' }).first()).toMatchObject({ status: 'accepted' }); // the migrated pending one
+    await expect(db.migrate.down(migrationConfig)).rejects.toThrow(/Rolling back migration 022 is not supported/);
+  });
+
   it('cannot be rolled back', async () => {
     db = await beforeOffers();
     await db.migrate.up(migrationConfig);

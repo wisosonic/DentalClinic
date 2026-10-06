@@ -20,7 +20,7 @@ const FRONT_DESK = {
   role: 'staff',
   appointmentsPerDay: ['2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11'].map((date, i) => ({ date, count: i === 0 ? 4 : i === 3 ? 2 : 0 })),
   overdueLabOrders: { count: 2, oldest: [{ id: 3, item: 'Zirconia crown', lab: 'Kadi Lab', patient: { id: 7, fname: 'Hicham', lname: 'Cheaib' }, dueAt: '2026-09-20' }] },
-  offersAwaitingAcceptance: 3,
+  offersToBook: 3,
 };
 
 const signIn = (role: string, charts: object | null, extra: object = {}) => {
@@ -101,7 +101,7 @@ describe('dashboard insights: doctor', () => {
 });
 
 describe('dashboard insights: staff', () => {
-  it('shows the week ahead, the overdue lab orders and the offers waiting, and no money', async () => {
+  it('shows the week ahead, the overdue lab orders and the treatment to book, and no money', async () => {
     signIn('staff', FRONT_DESK);
     renderApp(<App />, '/');
     const insights = await screen.findByRole('region', { name: 'Insights' });
@@ -114,14 +114,14 @@ describe('dashboard insights: staff', () => {
     expect(within(overdue).getByText('2')).toBeInTheDocument();
     expect(within(overdue).getByText('Zirconia crown · Kadi Lab')).toBeInTheDocument();
     expect(within(overdue).getByRole('link', { name: 'Browse overdue orders' })).toHaveAttribute('href', '/lab-orders?overdue=1');
-    expect(within(insights.querySelector('[aria-label="Offers awaiting acceptance"]') as HTMLElement).getByText('3')).toBeInTheDocument();
+    expect(within(insights.querySelector('[aria-label="Treatment to book"]') as HTMLElement).getByText('3')).toBeInTheDocument();
 
     expect(within(insights).queryByText('Biggest debts')).not.toBeInTheDocument();
     expect(within(insights).queryByRole('button', { name: 'Show as table' })).not.toBeInTheDocument();
   });
 
   it('says so when nothing is booked or overdue', async () => {
-    signIn('staff', { role: 'staff', appointmentsPerDay: FRONT_DESK.appointmentsPerDay.map((d) => ({ ...d, count: 0 })), overdueLabOrders: { count: 0, oldest: [] }, offersAwaitingAcceptance: 0 });
+    signIn('staff', { role: 'staff', appointmentsPerDay: FRONT_DESK.appointmentsPerDay.map((d) => ({ ...d, count: 0 })), overdueLabOrders: { count: 0, oldest: [] }, offersToBook: 0 });
     renderApp(<App />, '/');
     expect(await screen.findByText('Nothing booked in the next 7 days.')).toBeInTheDocument();
     expect(screen.getByText('No overdue orders.')).toBeInTheDocument();

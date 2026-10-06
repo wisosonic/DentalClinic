@@ -39,12 +39,10 @@ const q = (patientId: number, extra: { title?: string; price?: number; cost?: nu
   patientId, title: extra.title ?? 'Crown', description: extra.description, items: [{ description: extra.title ?? 'Crown', price: extra.price ?? 100, cost: extra.cost }],
 });
 const pay = (offerId: number, extra: object = {}) => ({ offerId, amount: 40, date: TODAY, method: 'cash', ...extra });
-const make = async (c: Client, patientId: number, status: 'sent' | 'accepted' | 'draft' = 'accepted', extra: object = {}) => {
-  const res = await c.post('/treatment-offers', q(patientId, extra));
+const make = async (c: Client, patientId: number, status: 'accepted' | 'draft' = 'accepted', extra: object = {}) => {
+  const res = await c.post('/treatment-offers', { ...q(patientId, extra), asDraft: status === 'draft' });
   expect(res.status, JSON.stringify(res.body)).toBe(201);
   const id = res.body.offer.id as number;
-  if (status !== 'draft') await c.post(`/treatment-offers/${id}/send`);
-  if (status === 'accepted') await c.post(`/treatment-offers/${id}/accept`);
   return id;
 };
 const del = (c: Client, url: string) => c.send('delete', url);
@@ -98,10 +96,10 @@ describe('recording payments', () => {
   it('only takes payments on offers that are open, with a valid date, method and amount', async () => {
     const draft = await make(aya, ayaPatient, 'draft');
     expect((await aya.post('/payments', pay(draft))).body.error.code).toBe('OFFER_NOT_OPEN');
-    const sent = await make(aya, ayaPatient, 'sent');
+    const sent = await make(aya, ayaPatient);
     expect((await aya.post('/payments', pay(sent))).status).toBe(201); // a sent offer can be paid
-    const rejected = await make(aya, ayaPatient, 'sent');
-    await aya.post(`/treatment-offers/${rejected}/reject`);
+    const rejected = await make(aya, ayaPatient);
+    await aya.post(`/treatment-offers/${rejected}/cancel`);
     expect((await aya.post('/payments', pay(rejected))).body.error.code).toBe('OFFER_NOT_OPEN');
     const ok = await make(aya, ayaPatient);
     for (const bad of [{ amount: 0 }, { amount: -1 }, { amount: 'x' }, { amount: 1.234 }, { method: 'bitcoin' }, { method: undefined }, { date: '2026-13-40' }, { date: undefined }]) {

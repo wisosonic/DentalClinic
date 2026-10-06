@@ -108,27 +108,26 @@ describe('events', () => {
     expect(await types(ayaUser)).toEqual([]);
   });
 
-  it('tell admins and the patient’s primary doctor about an offer sent, the staff too when it is accepted, and a payment received', async () => {
+  it('tell admins and the staff (who book its visits) about a new offer, and admins and the doctor about a payment received', async () => {
     const q = (await aya.post('/treatment-offers', { patientId: s.patientId, title: 'Crown', items: [{ description: 'Crown', price: 300 }] })).body.offer.id as number;
-    await aya.post(`/treatment-offers/${q}/send`);
-    expect(await types(adminUser)).toEqual(['offer.sent']);
-    expect(await types(ayaUser)).toEqual([]); // she did it
-    expect(await types(staffUser)).toEqual([]); // staff hear about it once it is accepted
-    await admin.post(`/treatment-offers/${q}/accept`);
-    expect(await types(ayaUser)).toEqual(['offer.accepted']);
-    expect(await types(staffUser)).toEqual(['offer.accepted']); // they book its visits
-    expect(await types(adminUser)).toEqual(['offer.sent']); // the actor is not told again
-    await staff.post('/payments', { offerId: q, amount: 100, method: 'cash', date: TODAY });
-    expect(await types(adminUser)).toEqual(['offer.sent', 'payment.received']);
-    expect(await types(ayaUser)).toEqual(['offer.accepted', 'payment.received']);
+    expect(await types(adminUser)).toEqual(['offer.accepted']);
     expect(await types(staffUser)).toEqual(['offer.accepted']);
+    expect(await types(ayaUser)).toEqual([]); // she did it herself
+    await staff.post('/payments', { offerId: q, amount: 100, method: 'cash', date: TODAY });
+    expect(await types(adminUser)).toEqual(['offer.accepted', 'payment.received']);
+    expect(await types(ayaUser)).toEqual(['payment.received']);
+    expect(await types(staffUser)).toEqual(['offer.accepted']); // the actor is not told about his own payment
+    const made = await t.db('notifications').where({ type: 'offer.accepted', user_id: staffUser }).first();
+    expect(made.content).toContain('agreed to');
+    expect(made.link).toBe(`/treatment-offers/${q}`);
     const n = await t.db('notifications').where({ type: 'payment.received', user_id: adminUser }).first();
     expect(n.content).toContain('$100.00');
     expect(n.content).toContain('Pat Patient');
   });
 
-  it('tell the doctor and the staff when an offer is accepted, and the doctor when its visit is booked', async () => {
-    const plan = (await aya.post('/treatment-offers', { patientId: s.patientId, title: 'Rehab', items: [{ description: 'Crown', price: 100 }] })).body.offer;
+  it('tell the doctor and the staff when a draft offer is confirmed (not while it is a draft), and the doctor when its visit is booked', async () => {
+    const plan = (await aya.post('/treatment-offers', { patientId: s.patientId, title: 'Rehab', asDraft: true, items: [{ description: 'Crown', price: 100 }] })).body.offer;
+    expect(await types(staffUser)).toEqual([]);
     await admin.post(`/treatment-offers/${plan.id}/accept`);
     expect(await types(ayaUser)).toEqual(['offer.accepted']);
     expect(await types(staffUser)).toEqual(['offer.accepted']);

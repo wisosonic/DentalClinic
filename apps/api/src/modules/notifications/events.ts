@@ -43,15 +43,15 @@ export async function appointmentNoShow(ctx: AppContext, id: number, actorId: nu
   });
 }
 
-/** An offer sent to or accepted by the patient: admins, the staff (who book its visits) and the patient's primary doctor. */
-export async function offerChanged(ctx: AppContext, offerId: number, status: 'sent' | 'accepted', actorId: number | null): Promise<void> {
+/** A treatment offer made (or a draft confirmed): admins, the staff (who book its visits) and the patient's primary doctor. */
+export async function offerAccepted(ctx: AppContext, offerId: number, actorId: number | null): Promise<void> {
   const q: Row | undefined = await ctx.db('quotes as q').join('patients as p', 'p.id', 'q.patient_id').where('q.id', offerId).first('q.title', 'q.price', 'q.patient_id', 'p.fname', 'p.lname');
   if (!q) return;
   await emitEvent(ctx, {
-    type: status === 'sent' ? 'offer.sent' : 'offer.accepted', actorId, title: status === 'sent' ? 'Offer sent' : 'Offer accepted',
-    content: status === 'sent' ? `${q.title} (${money(q.price)}) for ${q.fname} ${q.lname}.` : `${q.fname} ${q.lname} accepted “${q.title}” (${money(q.price)}). Its visits can be booked.`,
-    link: `/treatment-offers/${offerId}`, dedupeKey: `event:offer:${offerId}:${status}`,
-    recipients: async () => [...(await adminUserIds(ctx.db)), ...(status === 'accepted' ? await staffUserIds(ctx.db) : []), ...(await primaryDoctorUserIds(ctx.db, q.patient_id))],
+    type: 'offer.accepted', actorId, title: 'New treatment offer',
+    content: `${q.fname} ${q.lname} agreed to “${q.title}” (${money(q.price)}). Its visits can be booked.`,
+    link: `/treatment-offers/${offerId}`, dedupeKey: `event:offer:${offerId}:accepted`,
+    recipients: async () => [...(await adminUserIds(ctx.db)), ...(await staffUserIds(ctx.db)), ...(await primaryDoctorUserIds(ctx.db, q.patient_id))],
   });
 }
 

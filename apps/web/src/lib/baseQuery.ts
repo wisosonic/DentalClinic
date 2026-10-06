@@ -82,7 +82,7 @@ function dynamicMessage(code: string | undefined, d: Record<string, unknown> | u
         : null;
     case 'INVALID_OFFER_TRANSITION': {
       const offerStatus = typeof d.status === 'string' ? OFFER_STATUS_LABEL[d.status as keyof typeof OFFER_STATUS_LABEL] : undefined;
-      const verb = { send: 'sent', accept: 'accepted', reject: 'rejected', expire: 'marked as expired', cancel: 'cancelled' }[String(d.action)];
+      const verb = { accept: 'accepted', cancel: 'cancelled' }[String(d.action)];
       return offerStatus && verb ? translate('A {{status}} offer cannot be {{action}}', { status: translate(offerStatus).toLowerCase(), action: translate(verb) }) : null;
     }
     default:

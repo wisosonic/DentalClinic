@@ -15,7 +15,7 @@ import { assertBookable } from '../appointments/service';
 import { PAID_SQL, limitToScope, round2, type MoneyScope } from '../finance/service';
 import { clinicLetterhead } from '../finance/letterhead';
 import { renderOfferPdf } from '../finance/pdf';
-import { appointmentBooked, offerChanged } from '../notifications/events';
+import { appointmentBooked, offerAccepted } from '../notifications/events';
 import { CLOSED, OWING, mayWrite, offerQuery, offerScope, recalcOffer, syncOffer, toOfferDtos } from './service';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any -- DB row
@@ -147,11 +147,13 @@ export function offersRouter(ctx: AppContext): Router {
     // Another doctor's patient looks like no patient at all.
     if (!patient || !mayWrite(user, patient.doctor_id, scope)) throw badRequest('UNKNOWN_PATIENT', 'Unknown patient');
     const items = input.items ?? [];
+    // Made in the chair after the patient agreed: accepted at once, unless the doctor keeps it as an unfinished draft.
+    if (!input.asDraft && !items.length) throw new HttpError(409, 'EMPTY_OFFER', 'Add at least one item first');
     await checkItems(items);
     const now = sqlNow();
     const id = await db.transaction(async (trx) => {
       const [offerId] = await trx('quotes').insert({
-        title: input.title, description: input.description ?? null, type: 'clinic', price: 0, cost: 0, currency: '$', status: 'draft', patient_id: patient.id,
+        title: input.title, description: input.description ?? null, type: 'clinic', price: 0, cost: 0, currency: '$', status: input.asDraft ? 'draft' : 'accepted', patient_id: patient.id,
         doctor_id: patient.doctor_id ?? null, start_date: input.startDate ?? null, notes: input.notes ?? null, created_at: now, updated_at: now,
       });
       if (items.length) {
@@ -163,7 +165,8 @@ export function offersRouter(ctx: AppContext): Router {
       await recalcOffer(trx, offerId as number, { fromItems: true });
       return offerId as number;
     });
-    await audit(ctx, req, { userId: user.id, action: 'offer.create', entity: 'offer', entityId: id, diff: { patientId: patient.id, items: items.length } });
+    await audit(ctx, req, { userId: user.id, action: 'offer.create', entity: 'offer', entityId: id, diff: { patientId: patient.id, items: items.length, draft: !!input.asDraft } });
+    if (!input.asDraft) await offerAccepted(ctx, id, user.id);
     res.status(201).json({ offer: await show(user, id) });
   });
 
@@ -270,13 +273,10 @@ export function offersRouter(ctx: AppContext): Router {
     res.json({ offer: await show(user, id) });
   });
 
-  // send / accept / reject / expire / cancel: set by hand by the doctor or admin. Paid and the work state follow the payments and items.
+  // accept (a draft becomes final) / cancel: set by hand by the doctor or admin. Paid and the work state follow the payments and items.
   const RULES: Record<(typeof OFFER_ACTIONS)[number], { from: OfferStatus[]; to: OfferStatus; said: string }> = {
-    send: { from: ['draft'], to: 'sent', said: 'sent' },
-    accept: { from: ['draft', 'sent'], to: 'accepted', said: 'accepted' },
-    reject: { from: ['draft', 'sent', 'accepted'], to: 'rejected', said: 'rejected' },
-    expire: { from: ['sent'], to: 'expired', said: 'marked as expired' },
-    cancel: { from: ['draft', 'sent', 'accepted'], to: 'cancelled', said: 'cancelled' },
+    accept: { from: ['draft'], to: 'accepted', said: 'accepted' },
+    cancel: { from: ['draft', 'accepted'], to: 'cancelled', said: 'cancelled' },
   };
 
   router.post('/:id/:action', requirePermission('offers:update'), async (req, res) => {
@@ -290,11 +290,11 @@ export function offersRouter(ctx: AppContext): Router {
       throw new HttpError(409, 'INVALID_OFFER_TRANSITION', `A ${String(offer.status).replace('_', ' ')} offer cannot be ${rule.said}`, { status: offer.status, action: action.data });
     }
     const items: Row[] = await db('offer_items').where({ offer_id: id }).select('status');
-    if ((action.data === 'send' || action.data === 'accept') && !items.length) throw new HttpError(409, 'EMPTY_OFFER', 'Add at least one item first');
-    if ((action.data === 'reject' || action.data === 'cancel') && round2(Number(offer.paid)) > 0) {
+    if (action.data === 'accept' && !items.length) throw new HttpError(409, 'EMPTY_OFFER', 'Add at least one item first');
+    if (action.data === 'cancel' && round2(Number(offer.paid)) > 0) {
       throw new HttpError(409, 'HAS_PAYMENTS', `An offer with payments cannot be ${rule.said}`);
     }
-    if ((action.data === 'reject' || action.data === 'cancel') && items.some((i) => i.status !== 'pending')) {
+    if (action.data === 'cancel' && items.some((i) => i.status !== 'pending')) {
       throw new HttpError(409, 'WORK_STARTED', `An offer with visits booked or work done cannot be ${rule.said}`);
     }
     await db.transaction(async (trx) => {
@@ -302,7 +302,7 @@ export function offersRouter(ctx: AppContext): Router {
       if (!changed) throw new HttpError(409, 'INVALID_OFFER_TRANSITION', 'The offer was just changed by someone else');
     });
     await audit(ctx, req, { userId: user.id, action: `offer.${action.data}`, entity: 'offer', entityId: id, diff: { from: offer.status, to: rule.to } });
-    if (action.data === 'send' || action.data === 'accept') await offerChanged(ctx, id, action.data === 'send' ? 'sent' : 'accepted', user.id);
+    if (action.data === 'accept') await offerAccepted(ctx, id, user.id);
     res.json({ offer: await show(user, id) });
   });
 

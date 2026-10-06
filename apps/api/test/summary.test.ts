@@ -112,7 +112,7 @@ describe('finance summary', () => {
   it('works out what patients still owe from open quotes only, with the biggest debtors first', async () => {
     const a = await quote(s.patientId, 500, 'accepted');
     await pay(a, 150, '2026-10-02'); // 350 left
-    const b = await quote(s.patientId, 100, 'sent'); // 100 left
+    const b = await quote(s.patientId, 100, 'accepted'); // 100 left
     const c = await quote(s.otherPatientId, 80, 'accepted');
     await pay(c, 30, '2026-10-02'); // 50 left
     await quote(s.otherPatientId, 999, 'draft'); // not a debt yet

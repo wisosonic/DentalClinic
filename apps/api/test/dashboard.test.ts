@@ -166,9 +166,18 @@ describe('staff', () => {
     await t.db('labs').where({ id: lab }).del();
   });
 
-  it('counts offers sent and not yet accepted', async () => {
-    const offer = (status: string) => t.db('quotes').insert({ patient_id: s.patientId, title: 'P', type: 'clinic', price: 10, cost: 0, currency: '$', status, ...stamp });
-    await offer('sent'); await offer('sent'); await offer('accepted'); await offer('draft');
-    expect((await charts(staff)).offersAwaitingAcceptance).toBe(2);
+  it('counts accepted offers that still have work to book', async () => {
+    const offer = async (status: string, items: string[]) => {
+      const id = (await t.db('quotes').insert({ patient_id: s.patientId, title: 'P', type: 'clinic', price: 10, cost: 0, currency: '$', status, ...stamp }))[0]!;
+      for (const [i, st] of items.entries()) await t.db('offer_items').insert({ offer_id: id, description: `w${i}`, price: 5, sequence: i, status: st, ...stamp });
+    };
+    await offer('accepted', ['pending', 'done']); await offer('accepted', ['pending']); // two with something left to book
+    await offer('accepted', ['done']); // all finished
+    await offer('accepted', ['scheduled']); // booked, nothing pending
+    await offer('draft', ['pending']); // not final yet
+    await offer('cancelled', ['pending']);
+    const r = await charts(staff);
+    expect(r.offersToBook).toBe(2);
+    expect(r).not.toHaveProperty('offersAwaitingAcceptance');
   });
 });

@@ -46,8 +46,9 @@ export function dashboardRouter(ctx: AppContext): Router {
       const overdueCount = (await overdue.clone().count({ n: '*' }).first()) as Row | undefined;
       const oldest: Row[] = await overdue.clone().orderBy('o.due_at').orderBy('o.id').limit(5)
         .select('o.id', 'o.item', 'o.due_at', 'l.name as lab', 'p.id as pid', 'p.fname', 'p.lname');
-      const proposed = (await db('quotes as q').join('patients as p', 'p.id', 'q.patient_id').whereNull('q.deleted_at').whereNull('p.deleted_at')
-        .where('q.status', 'sent').count({ n: '*' }).first()) as Row | undefined;
+      const toBook = (await db('quotes as q').join('patients as p', 'p.id', 'q.patient_id').whereNull('q.deleted_at').whereNull('p.deleted_at')
+        .where('q.status', 'accepted').whereExists((s) => s.select(db.raw('1')).from('offer_items as i').whereRaw('i.offer_id = q.id').where('i.status', 'pending'))
+        .count({ n: '*' }).first()) as Row | undefined;
       const body: DashboardChartsDto = {
         role: 'staff',
         appointmentsPerDay: Array.from({ length: 7 }, (_, i) => {
@@ -58,7 +59,7 @@ export function dashboardRouter(ctx: AppContext): Router {
           count: Number(overdueCount?.n ?? 0),
           oldest: oldest.map((r) => ({ id: r.id, item: r.item, lab: r.lab, patient: { id: r.pid, fname: r.fname, lname: r.lname }, dueAt: r.due_at })),
         },
-        offersAwaitingAcceptance: Number(proposed?.n ?? 0),
+        offersToBook: Number(toBook?.n ?? 0),
       };
       res.json(body);
       return;

@@ -6,7 +6,8 @@ import { NOW, PASSWORD, TODAY, TOMORROW, buildTestApp, loggedIn, seedClinic, typ
  * Treatment offers (plans and quotes in one, owner decision 2026-10-06). Admin and staff see every offer (staff never
  * the cost), a doctor only those of patients whose primary doctor he is (another doctor's is a 404); admin and the
  * patient's doctor write; staff book the visits. The price is the sum of the items; the payment state and the work
- * state are worked out, never set by hand; an offer follows its visits.
+ * state are worked out, never set by hand; an offer follows its visits. It is made in the chair after the patient agreed, so
+ * a new offer is accepted at once; a doctor may keep an unfinished one as a draft, and cancel one that is not going ahead.
  */
 let t: TestApp;
 let s: Seed;
@@ -28,7 +29,7 @@ beforeAll(async () => {
 });
 afterAll(() => t.destroy());
 beforeEach(async () => {
-  for (const table of ['payments', 'offer_items', 'appointment_tooth', 'appointment_category', 'appointments', 'quotes', 'audit_log']) await t.db(table).del();
+  for (const table of ['notifications', 'payments', 'offer_items', 'appointment_tooth', 'appointment_category', 'appointments', 'quotes', 'audit_log']) await t.db(table).del();
 });
 
 const items = () => [
@@ -37,15 +38,11 @@ const items = () => [
 ];
 const offer = (extra: object = {}) => ({ patientId: s.patientId, title: 'Full rehabilitation', items: items(), ...extra });
 const slot = (extra: object = {}) => ({ doctorId: s.doctorId, clinicId: s.clinicId, unitId: s.unitId, date: TOMORROW, time: '10:00', durationMinutes: 30, ...extra });
+/** A new offer: accepted at once. */
 const created = async (c: Client = aya, extra: object = {}) => (await c.post('/treatment-offers', offer(extra))).body.offer;
-const sent = async (c: Client = aya, extra: object = {}) => {
-  const o = await created(c, extra);
-  return (await c.post(`/treatment-offers/${o.id}/send`)).body.offer;
-};
-const accepted = async (c: Client = aya, extra: object = {}) => {
-  const o = await created(c, extra);
-  return (await c.post(`/treatment-offers/${o.id}/accept`)).body.offer;
-};
+const accepted = created;
+/** An unfinished one the doctor keeps as a draft. */
+const drafted = async (c: Client = aya, extra: object = {}) => (await c.post('/treatment-offers', offer({ asDraft: true, ...extra }))).body.offer;
 const pay = (offerId: number, amount = 40) => ({ offerId, amount, date: TODAY, method: 'cash' });
 
 describe('creating and reading offers', () => {
@@ -53,7 +50,7 @@ describe('creating and reading offers', () => {
     const res = await aya.post('/treatment-offers', offer());
     expect(res.status).toBe(201);
     expect(res.body.offer).toMatchObject({
-      status: 'draft', price: 420.5, cost: 140.25, paid: 0, remaining: 420.5, paymentState: 'unpaid', workState: 'not_started',
+      status: 'accepted', price: 420.5, cost: 140.25, paid: 0, remaining: 420.5, paymentState: 'unpaid', workState: 'not_started',
       progress: { done: 0, total: 2, percent: 0 }, doctor: { id: s.doctorId }, currency: '$',
     });
     expect(res.body.offer.items.map((i: { description: string; sequence: number }) => [i.description, i.sequence])).toEqual([['Root canal', 1], ['Crown', 2]]);
@@ -62,11 +59,30 @@ describe('creating and reading offers', () => {
     expect(await t.db('quotes').where({ id: res.body.offer.id }).first()).toMatchObject({ price: 420.5, cost: 140.25 });
   });
 
-  it('can start with no items (a draft), and cannot be sent or accepted until it has one', async () => {
-    const empty = (await aya.post('/treatment-offers', offer({ items: [] }))).body.offer;
-    expect(empty).toMatchObject({ price: 0, workState: 'not_started' });
-    expect((await aya.post(`/treatment-offers/${empty.id}/send`)).body.error.code).toBe('EMPTY_OFFER');
-    expect((await aya.post(`/treatment-offers/${empty.id}/accept`)).body.error.code).toBe('EMPTY_OFFER');
+  it('is accepted as soon as it is made (the patient agreed in the chair), and tells the staff who book its visits', async () => {
+    const res = await aya.post('/treatment-offers', offer());
+    expect(res.body.offer.status).toBe('accepted');
+    const n = await t.db('notifications').where({ type: 'offer.accepted' });
+    expect(n.length).toBeGreaterThan(0);
+  });
+
+  it('needs at least one item, unless it is kept as a draft', async () => {
+    const none = await aya.post('/treatment-offers', offer({ items: [] }));
+    expect(none.status).toBe(409);
+    expect(none.body.error.code).toBe('EMPTY_OFFER');
+    const draft = (await aya.post('/treatment-offers', offer({ items: [], asDraft: true }))).body.offer;
+    expect(draft).toMatchObject({ status: 'draft', price: 0, workState: 'not_started' });
+    expect((await aya.post(`/treatment-offers/${draft.id}/accept`)).body.error.code).toBe('EMPTY_OFFER'); // a draft needs an item before it is final
+  });
+
+  it('can be kept as a draft: not binding, so no payments and no visits until it is accepted', async () => {
+    const d = await drafted();
+    expect(d.status).toBe('draft');
+    expect((await aya.post('/payments', pay(d.id))).body.error.code).toBe('OFFER_NOT_OPEN');
+    expect((await aya.post(`/treatment-offers/${d.id}/items/${d.items[0].id}/schedule`, slot())).body.error.code).toBe('OFFER_NOT_ACCEPTED');
+    expect(await t.db('notifications').where({ type: 'offer.accepted' }).count({ n: '*' }).first()).toMatchObject({ n: 0 }); // nobody is told about an unfinished one
+    expect((await aya.post(`/treatment-offers/${d.id}/accept`)).body.offer.status).toBe('accepted');
+    expect(await t.db('notifications').where({ type: 'offer.accepted' }).count({ n: '*' }).first()).not.toMatchObject({ n: 0 });
   });
 
   it('refuses staff and patients writing, another doctor’s patient, and bad input', async () => {
@@ -136,13 +152,13 @@ describe('creating and reading offers', () => {
     const a = await accepted(aya, { title: 'Alpha', items: [{ description: 'A', price: 300 }] });
     const b = await accepted(aya, { title: 'Bravo', items: [{ description: 'B', price: 100 }] });
     await aya.post('/payments', pay(b.id, 100));
-    const draft = await created(aya, { title: 'Charlie', items: [{ description: 'C', price: 50 }] });
+    const draft = await drafted(aya, { title: 'Charlie', items: [{ description: 'C', price: 50 }] });
     const ids = async (qs: string) => (await aya.get(`/treatment-offers?${qs}`)).body.data.map((x: { id: number }) => x.id);
     expect(await ids('paymentState=paid')).toEqual([b.id]);
     expect(await ids('paymentState=unpaid')).toEqual([draft.id, a.id]);
     expect(await ids('status=draft')).toEqual([draft.id]);
     expect(await ids('status=draft,accepted')).toHaveLength(3);
-    expect(await ids('debt=1')).toEqual([a.id]); // only an open offer with something left to pay
+    expect(await ids('debt=1')).toEqual([a.id]); // only an accepted offer with something left to pay (a draft is no debt)
     expect(await ids('q=alp')).toEqual([a.id]);
     expect(await ids('workState=not_started')).toHaveLength(3);
     expect(await ids('sort=price&order=desc')).toEqual([a.id, b.id, draft.id]);
@@ -151,7 +167,8 @@ describe('creating and reading offers', () => {
     expect((await ids('sort=remaining&order=desc'))[0]).toBe(a.id);
     for (const sort of ['patient', 'status', 'created']) expect((await aya.get(`/treatment-offers?sort=${sort}`)).status).toBe(200);
     expect((await aya.get('/treatment-offers?sort=password')).status).toBe(400);
-    expect((await aya.get('/treatment-offers?status=paid')).status).toBe(400); // paid is not a status any more
+    expect((await aya.get('/treatment-offers?status=paid')).status).toBe(400); // paid is not a status
+    expect((await aya.get('/treatment-offers?status=sent')).status).toBe(400); // nor is sent: nothing is sent online
   });
 });
 
@@ -190,27 +207,21 @@ describe('editing an offer', () => {
   });
 });
 
-describe('statuses, set by hand', () => {
-  it('goes draft -> sent -> accepted, and can be rejected, expired or cancelled where it makes sense', async () => {
-    const id = (await created()).id;
-    const act = async (a: string, c: Client = aya) => (await c.post(`/treatment-offers/${id}/${a}`)).body;
-    expect((await act('send')).offer.status).toBe('sent');
-    expect((await act('send')).error.code).toBe('INVALID_OFFER_TRANSITION');
-    expect((await act('accept')).offer.status).toBe('accepted');
-    expect((await act('expire')).error.code).toBe('INVALID_OFFER_TRANSITION'); // only a sent one expires
-    expect((await act('reject')).offer.status).toBe('rejected');
-    expect((await act('accept')).error.code).toBe('INVALID_OFFER_TRANSITION');
-    expect((await aya.post(`/treatment-offers/${id}/bogus`)).status).toBe(404);
-    expect((await staff.post(`/treatment-offers/${id}/accept`)).status).toBe(403);
-
-    const other = (await created()).id;
-    await aya.post(`/treatment-offers/${other}/send`);
-    expect((await aya.post(`/treatment-offers/${other}/expire`)).body.offer.status).toBe('expired');
-    const third = (await created()).id;
-    expect((await aya.post(`/treatment-offers/${third}/cancel`)).body.offer.status).toBe('cancelled');
+describe('statuses', () => {
+  it('has only draft, accepted and cancelled: a draft is accepted by hand, and an offer can be cancelled', async () => {
+    const d = await drafted();
+    const act = async (id: number, a: string, c: Client = aya) => (await c.post(`/treatment-offers/${id}/${a}`)).body;
+    expect((await act(d.id, 'accept')).offer.status).toBe('accepted');
+    expect((await act(d.id, 'accept')).error.code).toBe('INVALID_OFFER_TRANSITION');
+    for (const gone of ['send', 'reject', 'expire', 'bogus']) expect((await aya.post(`/treatment-offers/${d.id}/${gone}`)).status, gone).toBe(404);
+    expect((await staff.post(`/treatment-offers/${d.id}/cancel`)).status).toBe(403);
+    expect((await act(d.id, 'cancel')).offer.status).toBe('cancelled');
+    expect((await act(d.id, 'cancel')).error.code).toBe('INVALID_OFFER_TRANSITION');
+    expect((await act(d.id, 'accept')).error.code).toBe('INVALID_OFFER_TRANSITION');
+    expect((await act((await drafted()).id, 'cancel')).offer.status).toBe('cancelled'); // a draft can be dropped too
   });
 
-  it('is accepted straight from a draft, and never takes paid or partly paid as a status', async () => {
+  it('never takes paid or partly paid as a status', async () => {
     const o = await accepted();
     expect(o.status).toBe('accepted');
     await aya.post('/payments', pay(o.id, 420.5));
@@ -218,17 +229,9 @@ describe('statuses, set by hand', () => {
     expect(now).toMatchObject({ status: 'accepted', paymentState: 'paid' });
   });
 
-  it('counts a sent offer as accepted when something is paid on it', async () => {
-    const o = await sent();
-    expect(o.status).toBe('sent');
-    await aya.post('/payments', pay(o.id, 10));
-    expect((await aya.get(`/treatment-offers/${o.id}`)).body.offer).toMatchObject({ status: 'accepted', paymentState: 'partly_paid' });
-  });
-
-  it('refuses to reject or cancel an offer that has payments or visits', async () => {
+  it('refuses to cancel an offer that has payments or visits', async () => {
     const o = await accepted();
     await aya.post('/payments', pay(o.id, 10));
-    expect((await aya.post(`/treatment-offers/${o.id}/reject`)).body.error.code).toBe('HAS_PAYMENTS');
     expect((await aya.post(`/treatment-offers/${o.id}/cancel`)).body.error.code).toBe('HAS_PAYMENTS');
     const p = await accepted(aya, { title: 'With a visit' });
     await aya.post(`/treatment-offers/${p.id}/items/${p.items[0].id}/schedule`, slot());
@@ -270,8 +273,8 @@ describe('booking the visits of an offer', () => {
     expect((await aya.post(`/treatment-offers/${o.id}/items/999999/schedule`, slot({ time: '12:00' }))).status).toBe(404);
   });
 
-  it('needs the offer to be accepted first (sent is not enough)', async () => {
-    for (const o of [await created(), await sent()]) {
+  it('needs the offer to be accepted first (a draft is not enough)', async () => {
+    for (const o of [await drafted()]) {
       const res = await aya.post(`/treatment-offers/${o.id}/items/${o.items[0].id}/schedule`, slot());
       expect(res.status).toBe(409);
       expect(res.body.error.code).toBe('OFFER_NOT_ACCEPTED');
@@ -339,7 +342,7 @@ describe('an offer follows its visits', () => {
     expect(res.body.offer.workState).toBe('in_progress');
     expect((await aya.post(`/treatment-offers/${o.id}/items/${o.items[0].id}/done`)).status).toBe(409);
     expect((await staff.post(`/treatment-offers/${o.id}/items/${o.items[1].id}/done`)).status).toBe(403);
-    const draft = await created();
+    const draft = await drafted();
     expect((await aya.post(`/treatment-offers/${draft.id}/items/${draft.items[0].id}/done`)).body.error.code).toBe('OFFER_NOT_ACCEPTED');
   });
 });

@@ -94,7 +94,7 @@ function FrontDeskCharts({ data }: { data: DashboardChartsDto }) {
   const { t } = useTranslation();
   const days = data.appointmentsPerDay ?? [];
   const overdue = data.overdueLabOrders ?? { count: 0, oldest: [] };
-  const waiting = data.offersAwaitingAcceptance ?? 0;
+  const waiting = data.offersToBook ?? 0;
 
   return (
     <>
@@ -129,8 +129,8 @@ function FrontDeskCharts({ data }: { data: DashboardChartsDto }) {
       </Card>
 
       <Card
-        title={t('Offers awaiting acceptance')} note={t('Sent to the patient, not accepted yet.')}
-        action={<Button component={RouterLink} to="/treatment-offers?status=sent" variant="outlined" size="small" sx={{ alignSelf: 'flex-start' }}>{t('Browse treatment offers')}</Button>}
+        title={t('Treatment to book')} note={t('Accepted offers with work still to book.')}
+        action={<Button component={RouterLink} to="/treatment-offers?status=accepted" variant="outlined" size="small" sx={{ alignSelf: 'flex-start' }}>{t('Browse treatment offers')}</Button>}
       >
         <Typography variant="h4" component="p" dir="ltr" sx={{ textAlign: 'start' }}>{waiting}</Typography>
       </Card>

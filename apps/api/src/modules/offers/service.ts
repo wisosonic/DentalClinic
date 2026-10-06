@@ -6,12 +6,12 @@ import { PAID_SQL, doctorIdFor, round2, type Conn, type MoneyScope } from '../fi
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any -- DB row
 
-/** Offers that can take payments: sent to the patient or accepted. */
-export const PAYABLE: OfferStatus[] = ['sent', 'accepted'];
+/** Offers that can take payments: accepted ones (a draft is not binding yet, a cancelled one is closed). */
+export const PAYABLE: OfferStatus[] = ['accepted'];
 /** Offers that still count as debt when something is left to pay. */
-export const OWING: OfferStatus[] = ['sent', 'accepted'];
+export const OWING: OfferStatus[] = ['accepted'];
 /** Closed for good: nothing about them can be changed. */
-export const CLOSED: OfferStatus[] = ['rejected', 'expired', 'cancelled'];
+export const CLOSED: OfferStatus[] = ['cancelled'];
 
 /**
  * Who may SEE offers: an admin and the staff all of them (staff never see the cost), a doctor only those of the
@@ -98,7 +98,7 @@ export async function toOfferDtos(db: Db | Conn, rows: Row[], user: AuthUser, wi
 /**
  * Brings an offer's numbers in line with its items and payments, inside the caller's transaction: the price
  * and cost are the sums of the items, every payment shows the balance after it (oldest first, never below zero),
- * and an offer that has been paid on counts as accepted. The server alone works these out.
+ * The server alone works these out.
  */
 export async function recalcOffer(trx: Conn, offerId: number, opts: { fromItems?: boolean } = {}): Promise<{ price: number; paid: number; remaining: number }> {
   const offer = await trx('quotes').where({ id: offerId }).first('id', 'price', 'cost', 'status');
@@ -118,7 +118,6 @@ export async function recalcOffer(trx: Conn, offerId: number, opts: { fromItems?
   const update: Record<string, unknown> = {};
   if (round2(Number(offer!.price)) !== price) update.price = price;
   if (round2(Number(offer!.cost ?? 0)) !== cost) update.cost = cost;
-  if (paid > 0 && offer!.status === 'sent') update.status = 'accepted'; // a patient who pays has accepted
   if (Object.keys(update).length) await trx('quotes').where({ id: offerId }).update({ ...update, updated_at: sqlNow() });
   return { price, paid, remaining: Math.max(0, round2(price - paid)) };
 }

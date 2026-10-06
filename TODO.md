@@ -24,6 +24,8 @@ Phase 7 is built (see CLAUDE.md). Left:
 
 ## Treatment offers follow-ups
 
+The statuses are now draft, accepted and cancelled (migration 022 applies by itself when the API starts; it cannot be rolled back).
+
 The merge is built (see CLAUDE.md and section 13.2 of the plan). Left:
 
 - [ ] Look at the Treatment offers list and detail pages in the browser, in both languages and in dark mode; check the old data (70 offers with one item each) reads sensibly

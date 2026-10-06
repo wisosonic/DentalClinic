@@ -20,6 +20,7 @@ import * as m018 from './migrations/018_role_permissions';
 import * as m019 from './migrations/019_report_jobs';
 import * as m020 from './migrations/020_treatment_offers';
 import * as m021 from './migrations/021_patient_documents';
+import * as m022 from './migrations/022_offer_statuses';
 
 type Migration = { up(k: Knex): Promise<void>; down(k: Knex): Promise<void> };
 
@@ -46,6 +47,7 @@ const migrations: Record<string, Migration> = {
   '019_report_jobs': m019,
   '020_treatment_offers': m020,
   '021_patient_documents': m021,
+  '022_offer_statuses': m022,
 };
 
 const migrationSource: Knex.MigrationSource<string> = {

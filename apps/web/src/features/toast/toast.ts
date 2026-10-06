@@ -97,10 +97,7 @@ export const TOAST_MESSAGES: Record<string, string> = {
 
 /** Messages that depend on what was done to an appointment. */
 export const OFFER_ACTION_MESSAGES: Record<string, string> = {
-  send: 'Offer marked as sent',
   accept: 'Offer accepted',
-  reject: 'Offer rejected',
-  expire: 'Offer marked as expired',
   cancel: 'Offer cancelled',
 };
 

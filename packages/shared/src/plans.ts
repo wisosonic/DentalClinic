@@ -84,6 +84,6 @@ export interface DashboardChartsDto {
   appointmentsPerDay?: { date: string; count: number }[];
   /** Staff: lab orders past their due date and not received. */
   overdueLabOrders?: { count: number; oldest: { id: number; item: string; lab: string; patient: { id: number; fname: string; lname: string }; dueAt: string }[] };
-  /** Staff: offers sent to patients and not yet accepted. */
-  offersAwaitingAcceptance?: number;
+  /** Staff: accepted offers that still have work to book. */
+  offersToBook?: number;
 }

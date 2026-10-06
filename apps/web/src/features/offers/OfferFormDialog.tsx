@@ -97,10 +97,16 @@ export function OfferFormDialog({
 
   const total = items.reduce((sum, i) => sum + (Number(i.price) || 0), 0);
 
-  const submit = async () => {
+  /** `asDraft`: keep it unfinished (no items needed); otherwise a new offer is final, the patient having agreed. */
+  const submit = async (asDraft = false) => {
+    const filled = items.filter((i) => i.description.trim() || i.price || i.cost || i.categoryId || i.toothId); // an empty row is not an item
+    if (!offer && !asDraft && filled.length === 0) {
+      setErrors({ items: t('Add at least one item first') });
+      return;
+    }
     const draft = {
-      patientId: offer?.patientId ?? patient?.id, title, description, startDate, notes,
-      items: items.map((i) => ({
+      patientId: offer?.patientId ?? patient?.id, title, description, startDate, notes, ...(asDraft && { asDraft: true }),
+      items: (offer ? items : filled).map((i) => ({
         id: i.id, description: i.description, categoryId: i.categoryId || null, toothId: i.toothId || null, price: i.price === '' ? 0 : i.price, cost: i.cost === '' ? null : i.cost,
       })),
     };
@@ -142,6 +148,7 @@ export function OfferFormDialog({
         </Box>
 
         <Typography variant="subtitle1" sx={{ mt: 1, mb: 1, fontWeight: 700 }}>{t('Work to do, in order')}</Typography>
+        {errors.items && <Alert severity="error" sx={{ mb: 1 }} role="alert">{errors.items}</Alert>}
         <Stack spacing={1.5}>
           {items.map((item, index) => (
             <Paper key={item.key} variant="outlined" sx={{ p: 1.5 }}>
@@ -197,7 +204,8 @@ export function OfferFormDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={busy}>{t('Cancel')}</Button>
-        <Button variant="contained" onClick={submit} disabled={busy}>{busy ? t('Saving…') : editing ? t('Save changes') : t('Create offer')}</Button>
+        {!editing && <Button onClick={() => submit(true)} disabled={busy}>{t('Save as draft')}</Button>}
+        <Button variant="contained" onClick={() => submit(false)} disabled={busy}>{busy ? t('Saving…') : editing ? t('Save changes') : t('Create offer')}</Button>
       </DialogActions>
     </Dialog>
   );

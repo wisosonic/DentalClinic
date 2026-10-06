@@ -70,8 +70,9 @@ describe('treatment offers list', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Work' }));
     await waitFor(() => expect(lastCall('/treatment-offers').query.get('sort')).toBe('progress'));
     await userEvent.click(screen.getByLabelText('Status'));
-    await userEvent.click(await screen.findByRole('option', { name: 'Sent' }));
-    await waitFor(() => expect(lastCall('/treatment-offers').query.get('status')).toBe('sent'));
+    await userEvent.click(await screen.findByRole('option', { name: 'Draft' }));
+    await waitFor(() => expect(lastCall('/treatment-offers').query.get('status')).toBe('draft'));
+    expect(screen.queryByRole('option', { name: 'Sent' })).not.toBeInTheDocument(); // nothing is sent online
     await userEvent.click(screen.getByLabelText('Payment'));
     await userEvent.click(await screen.findByRole('option', { name: 'Partly paid' }));
     await waitFor(() => expect(lastCall('/treatment-offers').query.get('paymentState')).toBe('partly_paid'));
@@ -139,11 +140,18 @@ describe('a treatment offer', () => {
     expect(within(row).queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('offers only the next steps that make sense, and asks the server to move it along', async () => {
-    await open('doctor', offer({ status: 'sent' }), DOCTOR);
+  it('asks for nothing more on a new offer (it is accepted already), only to cancel or change it', async () => {
+    await open('doctor', offer(), DOCTOR);
+    for (const gone of ['Patient accepted', 'Mark as sent', 'Mark as expired', 'Rejected']) expect(screen.queryByRole('button', { name: gone }), gone).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel offer' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
+  });
+
+  it('lets a draft be accepted, and asks the server to move it along', async () => {
+    await open('doctor', offer({ status: 'draft' }), DOCTOR);
     api.routes['POST /treatment-offers/9/accept'] = () => json(200, { offer: offer({ status: 'accepted' }) });
     expect(screen.queryByRole('button', { name: 'Mark as sent' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Mark as expired' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mark as expired' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Patient accepted' }));
     await waitFor(() => expect(api.calls.some((c) => c.method === 'POST' && c.path === '/treatment-offers/9/accept')).toBe(true));
     expect(await screen.findByText('Offer accepted')).toBeInTheDocument();
@@ -158,8 +166,9 @@ describe('a treatment offer', () => {
   it('does not offer to book before the patient accepts', async () => {
     await open('doctor', offer({ status: 'draft' }), DOCTOR);
     expect(screen.queryByRole('button', { name: /Book a visit for/ })).not.toBeInTheDocument();
-    expect(screen.getByText('Visits can be booked once the patient has accepted the offer.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Mark as sent' })).toBeInTheDocument();
+    expect(screen.getByText('This offer is a draft. Visits and payments come once the patient has accepted it.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Patient accepted' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Record payment' })).not.toBeInTheDocument(); // a draft takes no payments
   });
 
   it('lists the payments for a doctor and records a new one on this offer', async () => {
@@ -230,11 +239,11 @@ describe('a treatment offer', () => {
   });
 
   it('shows the server’s refusal in the language of the screen', async () => {
-    await open('doctor', offer({ status: 'sent' }), DOCTOR);
+    await open('doctor', offer({ status: 'draft' }), DOCTOR);
     api.routes['POST /treatment-offers/9/accept'] = () => json(409, { error: { code: 'EMPTY_OFFER', message: 'Add at least one item first' } });
     await userEvent.click(screen.getByRole('button', { name: 'Patient accepted' }));
     expect(await screen.findByText('Add at least one item first')).toBeInTheDocument();
-    expect(errorMessage({ data: { error: { code: 'INVALID_OFFER_TRANSITION', message: 'x', details: { status: 'rejected', action: 'accept' } } } })).toBe('A rejected offer cannot be accepted');
+    expect(errorMessage({ data: { error: { code: 'INVALID_OFFER_TRANSITION', message: 'x', details: { status: 'cancelled', action: 'accept' } } } })).toBe('A cancelled offer cannot be accepted');
   });
 });
 
@@ -263,7 +272,37 @@ describe('the treatment offer form', () => {
     const body = api.calls.find((c) => c.method === 'POST' && c.path === '/treatment-offers')!.body;
     expect(body.patientId).toBe(7);
     expect(body.items.map((i: { description: string; price: number; cost: number | null }) => [i.description, i.price, i.cost])).toEqual([['Crown', 300.5, null], ['Root canal', 120, 40]]);
+    expect(body.asDraft).toBeUndefined(); // final: the patient agreed in the chair
     expect(await screen.findByText('Treatment offer created')).toBeInTheDocument();
+  });
+
+  it('can be saved as a draft, even with nothing listed yet', async () => {
+    signIn('doctor', DOCTOR);
+    api.routes['GET /treatment-offers'] = () => page([]);
+    api.routes['POST /treatment-offers'] = () => json(201, { offer: offer({ status: 'draft' }) });
+    api.routes['GET /treatment-offers/9'] = () => json(200, { offer: offer({ status: 'draft' }) });
+    api.routes['GET /payments'] = () => page([]);
+    api.routes['GET /patients/7'] = () => json(200, { patient: PATIENT });
+    renderApp(<App />, '/treatment-offers?patientId=7');
+    await userEvent.click(await screen.findByRole('button', { name: 'New treatment offer' }));
+    const dialog = await screen.findByRole('dialog', { name: 'New treatment offer' });
+    await userEvent.type(within(dialog).getByLabelText(/^Title/), 'Still thinking');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save as draft' }));
+    await waitFor(() => expect(api.calls.some((c) => c.method === 'POST' && c.path === '/treatment-offers')).toBe(true));
+    expect(api.calls.find((c) => c.method === 'POST' && c.path === '/treatment-offers')!.body).toMatchObject({ patientId: 7, title: 'Still thinking', asDraft: true, items: [] });
+  });
+
+  it('needs at least one item to make a final offer, and says so without sending anything', async () => {
+    signIn('doctor', DOCTOR);
+    api.routes['GET /treatment-offers'] = () => page([]);
+    api.routes['GET /patients/7'] = () => json(200, { patient: PATIENT });
+    renderApp(<App />, '/treatment-offers?patientId=7');
+    await userEvent.click(await screen.findByRole('button', { name: 'New treatment offer' }));
+    const dialog = await screen.findByRole('dialog', { name: 'New treatment offer' });
+    await userEvent.type(within(dialog).getByLabelText(/^Title/), 'Crown');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Create offer' }));
+    expect(await within(dialog).findByText('Add at least one item first')).toBeInTheDocument();
+    expect(api.calls.some((c) => c.method === 'POST')).toBe(false);
   });
 
   it('asks for a title and a patient, and refuses a price with more than two decimals, before sending', async () => {
@@ -272,10 +311,10 @@ describe('the treatment offer form', () => {
     renderApp(<App />, '/treatment-offers');
     await userEvent.click(await screen.findByRole('button', { name: 'New treatment offer' }));
     const dialog = await screen.findByRole('dialog', { name: 'New treatment offer' });
+    await userEvent.type(within(dialog).getByLabelText('Description of item 1'), 'Crown');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Create offer' }));
     expect(await within(dialog).findByText('Title is required')).toBeInTheDocument();
     expect(within(dialog).getByText('Choose a patient')).toBeInTheDocument();
-    await userEvent.type(within(dialog).getByLabelText('Description of item 1'), 'Crown');
     fireEvent.change(within(dialog).getByLabelText('Price of item 1'), { target: { value: '10.123' } });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Create offer' }));
     expect(await within(dialog).findByText('Use at most two decimals')).toBeInTheDocument();

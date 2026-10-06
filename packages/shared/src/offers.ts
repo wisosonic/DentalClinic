@@ -14,13 +14,16 @@ const optionalId = z.preprocess((v) => (v === '' || v === 0 ? null : v), idSchem
 // ---------------------------------------------------------------------------
 
 /**
- * The offer's own status, set by hand by the doctor or admin. Whether it has been paid and how far the work has
- * got are NOT part of it: they are worked out from the payments and the items (`OfferPaymentState`, `OfferWorkState`).
+ * The offer's own status. An offer is made in the chair, after the patient has agreed to the treatment and its price,
+ * so a new offer is `accepted` at once (owner decision 2026-10-06; there is no online sending to wait on). A doctor
+ * can still keep an unfinished one as a `draft` (not binding: no payments, no visits) and accept it later; `cancelled`
+ * closes one the patient is not going ahead with. Whether it has been paid and how far the work has got are NOT part
+ * of it: they are worked out from the payments and the items (`OfferPaymentState`, `OfferWorkState`).
  */
-export const OFFER_STATUSES = ['draft', 'sent', 'accepted', 'rejected', 'expired', 'cancelled'] as const;
+export const OFFER_STATUSES = ['draft', 'accepted', 'cancelled'] as const;
 export type OfferStatus = (typeof OFFER_STATUSES)[number];
 
-export const OFFER_ACTIONS = ['send', 'accept', 'reject', 'expire', 'cancel'] as const;
+export const OFFER_ACTIONS = ['accept', 'cancel'] as const;
 export type OfferAction = (typeof OFFER_ACTIONS)[number];
 
 /** Worked out from the payments: nothing paid, something paid, or everything (or more) paid. */
@@ -51,6 +54,8 @@ export const offerInputSchema = z.object({
   startDate: optionalDate,
   notes: optionalText(5000),
   items: z.array(offerItemInputSchema).max(60).default([]),
+  /** Keep it as an unfinished draft instead of making it final (needs no items). */
+  asDraft: z.boolean().optional(),
 });
 export type OfferInput = z.input<typeof offerInputSchema>;
 
