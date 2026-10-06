@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+*.sqlite
+*.sqlite-journal
+apps/api/data/
+coverage/
+*.log
+
+# The original clinic dump holds real patient data and the admin's password hash: never commit it
+aya_clinic.sql
+*.sqlite-wal
+*.sqlite-shm
+data/
+.env.*
+!.env.example
