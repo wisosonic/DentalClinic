@@ -1,5 +1,5 @@
 {
-  "name": "aya-clinic",
+  "name": "dental-clinic",
   "private": true,
   "workspaces": [
     "apps/*",

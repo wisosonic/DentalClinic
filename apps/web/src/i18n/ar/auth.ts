@@ -2,7 +2,7 @@ import type { Dictionary } from './types';
 
 /** Signing in, passwords and the session. */
 export const auth: Dictionary = {
-  'Aya Clinic': 'عيادة آية',
+  'Dental Clinic': 'عيادة الأسنان',
   'Welcome, {{name}}': 'أهلاً، {{name}}',
   'Sign in': 'تسجيل الدخول',
   'Signing in…': 'جارٍ تسجيل الدخول…',

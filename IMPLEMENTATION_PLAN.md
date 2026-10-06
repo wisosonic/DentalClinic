@@ -1,4 +1,4 @@
-# Aya Clinic — Dental Management System: Implementation Plan
+# Dental Clinic — Dental Management System: Implementation Plan
 
 Status: **phases 0–3 implemented** (see §13) · Source schema: [aya_clinic.sql](aya_clinic.sql) (MariaDB 10.4, Laravel-generated)
 

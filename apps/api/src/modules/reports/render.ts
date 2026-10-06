@@ -37,7 +37,7 @@ const colLetter = (index: number): string => {
 /** Excel: a header row that stays in view, typed cells, and totals as real formulas. */
 export async function renderXlsx(table: ReportTable): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  wb.creator = 'Aya Clinic';
+  wb.creator = 'Dental Clinic';
   wb.created = new Date();
   const ws = wb.addWorksheet(table.title.slice(0, 31).replace(/[\\/?*[\]:]/g, ' '), { views: [{ state: 'frozen', ySplit: 3 }] });
   ws.getCell('A1').value = table.title;
@@ -85,7 +85,7 @@ export async function renderXlsx(table: ReportTable): Promise<Buffer> {
  */
 export async function renderXlsxToFile(table: ReportTable, filename: string): Promise<void> {
   const wb = new ExcelJS.stream.xlsx.WorkbookWriter({ filename, useStyles: true, useSharedStrings: false });
-  wb.creator = 'Aya Clinic';
+  wb.creator = 'Dental Clinic';
   wb.created = new Date();
   const ws = wb.addWorksheet(table.title.slice(0, 31).replace(/[\\/?*[\]:]/g, ' '), { views: [{ state: 'frozen', ySplit: 3 }] });
   table.columns.forEach((c, i) => { ws.getColumn(i + 1).width = c.width; });

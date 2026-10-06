@@ -1,4 +1,4 @@
-# Aya Clinic — Dental Management System
+# Dental Clinic — Dental Management System
 
 Full-stack web app for a dental clinic: appointments, patient records and tooth charts, treatment offers, payments and expenses, labs, medications, in-app reminders, PDF/Excel reports, and a secure login for staff and patients.
 

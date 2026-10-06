@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Project
 
-Aya Clinic dental management system: React frontend, Node.js REST API, SQLite in development (MariaDB/MySQL later). The design lives in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Read the relevant section before starting a phase, and keep the plan up to date when a decision changes.
+Dental Clinic dental management system: React frontend, Node.js REST API, SQLite in development (MariaDB/MySQL later). The design lives in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md). Read the relevant section before starting a phase, and keep the plan up to date when a decision changes.
 
 **Current status:** phases 0–7 done (patients, appointments, doctor kinds, dental units, visit reports with prescriptions, timeline, dental panorama, PDF, money: payments, expenses, commission, summary; treatment offers (treatment plans and quotes in one); lab orders, labs and suppliers), plus external-specialist sign-in and the Arabic interface. Roles and permissions are editable by the admin (see below). Patient documents (x-ray, panoramic, CBCT report, blood analysis) are built (see below). Next is phase 8 (patient portal), then the rest of "Do next" in TODO.md. Work follows phases 0–10 in section 13 of the plan, in order; the plan's Progress table is the source of truth, so update it when a phase finishes.
 
