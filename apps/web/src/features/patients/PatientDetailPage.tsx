@@ -68,6 +68,7 @@ export function PatientDetailPage() {
       <PageHeader
         title={fullName(patient)}
         subtitle={t('Patient #{{number}}', { number: patient.patientIdentifier })}
+        actionsBelow
         actions={
           <Stack direction="row" gap={1} flexWrap="wrap">
             <Button variant="contained" startIcon={<AddIcon />} onClick={() => openCreate({ patient })}>{t('Book appointment')}</Button>
