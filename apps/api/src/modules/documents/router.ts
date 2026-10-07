@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { access, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import express, { Router } from 'express';
+import express, { Router, type Response } from 'express';
 import { z } from 'zod';
 import {
   DOCUMENT_MAX_BYTES, DOCUMENT_MAX_PER_PATIENT, DOCUMENT_MIME_TYPES, DOCUMENT_CATEGORIES, documentUpdateSchema, documentUploadSchema,
@@ -47,6 +47,40 @@ export async function removeDocumentFiles(env: { UPLOAD_DIR: string }, names: (s
     await unlink(path.join(documentDir(env), name)).catch(() => undefined);
     await unlink(path.join(documentDir(env), thumbName(name))).catch(() => undefined); // none for a PDF: ignored
   }
+}
+
+/** Sends the stored file of a document row, inline, with the headers that keep it from running or being cached. */
+export function sendDocumentFile(res: Response, env: { UPLOAD_DIR: string }, row: Row): void {
+  if (!STORED_NAME.test(row.file_name)) throw notFound('Document not found');
+  const ext = row.file_name.split('.').pop() as string;
+  const headers: Record<string, string> = {
+    'Content-Type': row.mime, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff',
+    'Content-Disposition': `inline; filename="${downloadName(row, ext)}"`,
+  };
+  // A picture can never run anything; a PDF is shown by the browser's own viewer, which a sandbox policy would stop.
+  if (row.mime !== 'application/pdf') headers['Content-Security-Policy'] = "default-src 'none'; sandbox";
+  res.sendFile(row.file_name, { root: documentDir(env), dotfiles: 'deny', headers }, (err) => {
+    if (err && !res.headersSent) res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Document not found' } });
+  });
+}
+
+/** Sends the small preview of a picture. Made on first request when it is missing (older uploads); a PDF has none. */
+export async function sendDocumentThumbnail(res: Response, env: { UPLOAD_DIR: string }, row: Row): Promise<void> {
+  if (!STORED_NAME.test(row.file_name) || !String(row.mime).startsWith('image/')) throw notFound('Document not found');
+  const thumb = thumbName(row.file_name);
+  const full = path.join(documentDir(env), thumb);
+  const exists = await access(full).then(() => true, () => false);
+  if (!exists) {
+    const made = await makeThumbnail(await readFile(path.join(documentDir(env), row.file_name)).catch(() => Buffer.alloc(0)));
+    if (!made) throw notFound('Document not found');
+    await writeFile(full, made);
+  }
+  res.sendFile(thumb, {
+    root: documentDir(env), dotfiles: 'deny',
+    headers: { 'Content-Type': 'image/webp', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox" },
+  }, (err) => {
+    if (err && !res.headersSent) res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Document not found' } });
+  });
 }
 
 /**
@@ -170,37 +204,14 @@ export function documentRouters(ctx: AppContext): { forPatient: Router; byId: Ro
     const row = await load(user, idParam.parse(req.params.id));
     if (!STORED_NAME.test(row.file_name)) throw notFound('Document not found');
     await auditView(ctx, req, { user, action: 'document.view', patientId: row.patient_id });
-    const ext = row.file_name.split('.').pop() as string;
-    const headers: Record<string, string> = {
-      'Content-Type': row.mime, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff',
-      'Content-Disposition': `inline; filename="${downloadName(row, ext)}"`,
-    };
-    // A picture can never run anything; a PDF is shown by the browser's own viewer, which a sandbox policy would stop.
-    if (row.mime !== 'application/pdf') headers['Content-Security-Policy'] = "default-src 'none'; sandbox";
-    res.sendFile(row.file_name, { root: documentDir(env), dotfiles: 'deny', headers }, (err) => {
-      if (err && !res.headersSent) res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Document not found' } });
-    });
+    sendDocumentFile(res, env, row);
   });
 
   // A small preview of a picture for the list. Made on first request when it is missing (older uploads); a PDF has none.
   byId.get('/:id/thumbnail', requirePermission('documents:read'), async (req, res) => {
     const user = requireUser(req);
     const row = await load(user, idParam.parse(req.params.id));
-    if (!STORED_NAME.test(row.file_name) || !String(row.mime).startsWith('image/')) throw notFound('Document not found');
-    const thumb = thumbName(row.file_name);
-    const full = path.join(documentDir(env), thumb);
-    const exists = await access(full).then(() => true, () => false);
-    if (!exists) {
-      const made = await makeThumbnail(await readFile(path.join(documentDir(env), row.file_name)).catch(() => Buffer.alloc(0)));
-      if (!made) throw notFound('Document not found');
-      await writeFile(full, made);
-    }
-    res.sendFile(thumb, {
-      root: documentDir(env), dotfiles: 'deny',
-      headers: { 'Content-Type': 'image/webp', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox" },
-    }, (err) => {
-      if (err && !res.headersSent) res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Document not found' } });
-    });
+    await sendDocumentThumbnail(res, env, row);
   });
 
   byId.patch('/:id', requirePermission('documents:update'), async (req, res) => {

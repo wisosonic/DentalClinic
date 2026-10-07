@@ -13,31 +13,25 @@ Last updated 2026-10-06, after phase 7 and its follow-ups, editable roles, treat
 
 ---
 
-## Phase 7 follow-ups
+## Patient portal follow-ups
 
-Phase 7 is built (see CLAUDE.md). Left:
+The portal is built (see CLAUDE.md). Left:
 
-- [ ] Reminders and notifications for **patients**: the owner will decide in phase 8 how patient accounts are provided; nothing is built until then (the generator already supports it)
+- [ ] **Owner: confirm the patient reminder lead time.** Patients are reminded **a day ahead** (24 hours) of a confirmed appointment, in the bell only (no email, SMS or WhatsApp); say if it should be another time, or if patients should also be told about payments or a new treatment plan
+- [ ] Owner: say if patients forgetting their password need a self-service reset (the clinic sends no email, so for now staff make a new patient card or an admin hands a one-time link from *Users*)
+- [ ] Optional: make the portal installable as an app (PWA: manifest and an offline shell)
+- [ ] Look at the portal pages on a phone and on a desktop, in both languages and in dark mode, with a real patient login
 
 ---
 
 ## Patient documents follow-ups
 
-The documents, their previews and the "visible to the patient" mark are built (see CLAUDE.md). Left:
+The documents, their previews and the "visible to the patient" mark are built, and the portal shows the marked ones (see CLAUDE.md). Left:
 
-- [ ] Phase 8: the portal lists and opens the documents marked **Visible to the patient** (a patient endpoint that checks the mark and `assertPatientAccess`, and a screen)
 - [ ] Optional: link a document to a visit in the screens (the API already takes the visit); DICOM or ZIP studies only if the owner asks
 - [ ] Before launch: encrypt the server disk (the uploads and the database hold patient health data); backups are `npm run db:dump -- --with-uploads`, see the backups item in phase 10
 
 ---
-
-## Phase 8: Patient portal
-
-- [ ] **Timeline history:** the patient sees their appointments as a timeline, newest first, each expandable to its report (summary and prescriptions only); links to the printable visit summary
-- [ ] Patients who forget their password: staff make a new card (built), or an admin hands a one-time link from *Users*; decide with the owner whether the portal also needs a self-service reset (the clinic sends no email)
-- [ ] Portal UI (English and Arabic; use the existing translation layer), view only: upcoming appointments with a cancel button (24 h notice) and balance, NO booking (patients phone the clinic), own appointments, plans, quotes, payments, profile
-- [ ] Patient view of own visit summary PDF
-- [ ] Mobile polish; optionally installable (PWA)
 
 ## Phase 9: Secondary modules
 

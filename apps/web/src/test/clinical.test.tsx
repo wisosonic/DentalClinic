@@ -21,7 +21,7 @@ describe('navigation by role', () => {
     ['admin', ['Appointments', 'Patients', 'Treatment offers', 'Lab orders', 'Reports', 'Doctors', 'Clinics', 'Summary', 'Income tax', 'By doctor', 'Payments', 'Expenses', 'Commission', 'Medications', 'Procedures', 'Labs', 'Suppliers', 'Deleted clinics’ data', 'Users', 'Roles', 'Trash', 'Activity log']],
     ['doctor', ['Appointments', 'Patients', 'Treatment offers', 'Lab orders', 'Reports', 'Doctors', 'By doctor', 'Payments', 'Commission', 'Medications']],
     ['staff', ['Appointments', 'Patients', 'Treatment offers', 'Lab orders', 'Reports', 'Payments', 'Expenses', 'Labs', 'Suppliers']],
-    ['patient', []],
+    ['patient', ['My appointments', 'My treatment', 'My payments', 'My documents', 'My profile']],
   ])('%s sees the right menu', async (role, items) => {
     signIn(role);
     renderApp(<App />);
@@ -43,7 +43,9 @@ describe('navigation by role', () => {
   it('keeps patients out of the patient list', async () => {
     signIn('patient');
     renderApp(<App />, '/patients');
-    expect(await screen.findByText(/patient portal is coming soon/i)).toBeInTheDocument();
+    api.routes['GET /portal/overview'] = () => json(200, { patient: { id: 7, fname: 'Pat', lname: 'Patient', patientIdentifier: '100001', username: 'pat.patient', doctor: null }, next: null, upcomingCount: 0, balance: { price: 0, paid: 0, remaining: 0, currency: '$' }, documentsCount: 0, cancelMinHours: 24 });
+    expect(await screen.findByRole('heading', { name: 'Your next appointment' })).toBeInTheDocument(); // sent to their own home page
+    expect(screen.queryByRole('heading', { name: 'Patients' })).not.toBeInTheDocument();
     expect(api.calls.some((c) => c.path === '/patients')).toBe(false);
   });
 });

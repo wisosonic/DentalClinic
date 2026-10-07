@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import type { AppContext } from '../context';
 import { clinicNow, toMinutes } from '../lib/time';
-import { adminUserIds, doctorUserIds, notify, staffUserIds } from '../modules/notifications/service';
+import { adminUserIds, doctorUserIds, notify, patientUserIds, staffUserIds } from '../modules/notifications/service';
 import { notificationSwitches } from '../modules/settings/app';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any -- DB row
@@ -19,6 +19,8 @@ const minutesUntil = (now: { date: string; minutes: number }, date: string, time
 
 /** How long before an appointment its reminder goes out. */
 export const REMINDER_MINUTES = 120;
+/** The patient's own reminder goes out a day ahead (an assumption to confirm with the owner), so they can cancel in time. */
+export const PATIENT_REMINDER_MINUTES = 24 * 60;
 
 /**
  * Reminds the appointment's doctor and the staff of every confirmed appointment that starts within the next two
@@ -31,11 +33,18 @@ export async function runReminders(ctx: AppContext): Promise<number> {
   const now = clinicNow(env, ctx.clock());
   const rows: Row[] = await db('appointments as a').join('patients as p', 'p.id', 'a.patient_id').join('doctors as d', 'd.id', 'a.doctor_id')
     .whereNull('a.deleted_at').whereNull('p.deleted_at').where('a.status', 'confirmed').whereBetween('a.date', [now.date, addDays(now.date, 1)])
-    .select('a.id', 'a.date', 'a.time', 'a.doctor_id', 'p.fname', 'p.lname', 'd.fname as d_fname', 'd.lname as d_lname');
+    .select('a.id', 'a.date', 'a.time', 'a.doctor_id', 'a.patient_id', 'p.fname', 'p.lname', 'd.fname as d_fname', 'd.lname as d_lname');
   const staff = await staffUserIds(db);
   let told = 0;
   for (const a of rows) {
     const left = minutesUntil(now, a.date, a.time);
+    if (left > 0 && left <= PATIENT_REMINDER_MINUTES) {
+      told += await notify(ctx, {
+        userIds: await patientUserIds(db, a.patient_id), type: 'appointment.reminder', title: 'Appointment reminder',
+        content: `You have an appointment with Dr ${a.d_fname} ${a.d_lname} ${a.date === now.date ? 'today' : 'tomorrow'} at ${a.time}. To cancel it online, do it at least ${env.CANCEL_MIN_HOURS} hours ahead.`,
+        link: '/my/appointments', appointmentId: a.id, dedupeKey: `appt:${a.id}:patient:${a.date}T${a.time}`,
+      });
+    }
     if (left <= 0 || left > REMINDER_MINUTES) continue;
     told += await notify(ctx, {
       userIds: [...(await doctorUserIds(db, a.doctor_id)), ...staff], type: 'appointment.reminder',

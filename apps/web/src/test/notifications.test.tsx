@@ -25,11 +25,11 @@ describe('the notification bell', () => {
     expect(await screen.findByRole('button', { name: 'Notifications, 1 unread' })).toBeInTheDocument();
   });
 
-  it('is there for admins, doctors and staff, but not for patients', async () => {
+  it('is there for everyone who signs in, patients included (their reminders and bookings arrive there)', async () => {
     signIn('patient');
     renderApp(<App />, '/');
     await screen.findByText(/Welcome/);
-    expect(screen.queryByRole('button', { name: /Notifications/ })).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /Notifications/ })).toBeInTheDocument();
   });
 
   it('opens a list with the unread ones marked, newest first', async () => {

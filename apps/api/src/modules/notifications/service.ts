@@ -81,6 +81,12 @@ export async function doctorUserIds(db: Db, doctorId: number | null | undefined)
   return row ? [row.id as number] : [];
 }
 
+/** The patient's own login, when they have one and it is switched on. */
+export async function patientUserIds(db: Db, patientId: number): Promise<number[]> {
+  const row = await db('patients as p').join('users as u', 'u.id', 'p.user_id').where({ 'p.id': patientId, 'u.is_active': true }).first('u.id');
+  return row ? [row.id as number] : [];
+}
+
 /** The login of the patient's primary doctor. */
 export async function primaryDoctorUserIds(db: Db, patientId: number): Promise<number[]> {
   const p = await db('patients').where({ id: patientId }).first('doctor_id');

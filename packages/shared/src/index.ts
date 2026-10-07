@@ -97,6 +97,7 @@ export * from './finance';
 export * from './plans';
 export * from './offers';
 export * from './documents';
+export * from './portal';
 export * from './tax';
 export * from './settings';
 export * from './roles';

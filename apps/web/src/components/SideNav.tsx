@@ -7,6 +7,10 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+import EventNoteIcon from '@mui/icons-material/EventNote';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import FolderIcon from '@mui/icons-material/Folder';
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import AssignmentIcon from '@mui/icons-material/Assignment';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import BadgeIcon from '@mui/icons-material/Badge';
@@ -46,6 +50,17 @@ interface Group { id: string; label: string; icon: ReactNode; accent: string; it
 
 /** Related pages together. A group with nothing the person may open is not shown at all. */
 const GROUPS: Group[] = [
+  {
+    // A patient's own pages (the patient portal): view only.
+    id: 'my', label: 'My care', icon: <FavoriteBorderIcon fontSize="small" />, accent: '#40bfb9',
+    items: [
+      { to: '/my/appointments', label: 'My appointments', icon: <EventNoteIcon />, roles: ['patient'] },
+      { to: '/my/treatment', label: 'My treatment', icon: <AssignmentIcon />, roles: ['patient'] },
+      { to: '/my/payments', label: 'My payments', icon: <PaymentsIcon />, roles: ['patient'] },
+      { to: '/my/documents', label: 'My documents', icon: <FolderIcon />, roles: ['patient'] },
+      { to: '/my/profile', label: 'My profile', icon: <PersonOutlineIcon />, roles: ['patient'] },
+    ],
+  },
   {
     id: 'clinic', label: 'Clinic', icon: <HealthAndSafetyIcon fontSize="small" />, accent: '#40bfb9',
     items: [

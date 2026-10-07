@@ -41,6 +41,11 @@ const AppearanceSection = lazy(() => import('./features/settings/Sections').then
 const TaxesSection = lazy(() => import('./features/tax/SettingsPage').then((m) => ({ default: m.TaxesSection })));
 const ReportsPage = lazy(() => import('./features/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })));
 const DeletedClinicsPage = lazy(() => import('./features/clinic/DeletedClinicsPage').then((m) => ({ default: m.DeletedClinicsPage })));
+const PortalAppointmentsPage = lazy(() => import('./features/portal/PortalPages').then((m) => ({ default: m.PortalAppointmentsPage })));
+const PortalTreatmentPage = lazy(() => import('./features/portal/PortalPages').then((m) => ({ default: m.PortalTreatmentPage })));
+const PortalPaymentsPage = lazy(() => import('./features/portal/PortalPages').then((m) => ({ default: m.PortalPaymentsPage })));
+const PortalDocumentsPage = lazy(() => import('./features/portal/PortalPages').then((m) => ({ default: m.PortalDocumentsPage })));
+const PortalProfilePage = lazy(() => import('./features/portal/PortalPages').then((m) => ({ default: m.PortalProfilePage })));
 const ClinicsPage = lazy(() => import('./features/clinic/ClinicSettingsPage').then((m) => ({ default: m.ClinicsPage })));
 
 function Fallback() {
@@ -66,6 +71,14 @@ export function App() {
           <Route path="/change-password" element={<ChangePasswordPage />} />
           <Route element={<AppLayout />}>
             <Route path="/" element={<DashboardPage />} />
+
+            <Route element={<ProtectedRoute roles={['patient']} />}>
+              <Route path="/my/appointments" element={<Suspense fallback={fallback}><PortalAppointmentsPage /></Suspense>} />
+              <Route path="/my/treatment" element={<Suspense fallback={fallback}><PortalTreatmentPage /></Suspense>} />
+              <Route path="/my/payments" element={<Suspense fallback={fallback}><PortalPaymentsPage /></Suspense>} />
+              <Route path="/my/documents" element={<Suspense fallback={fallback}><PortalDocumentsPage /></Suspense>} />
+              <Route path="/my/profile" element={<Suspense fallback={fallback}><PortalProfilePage /></Suspense>} />
+            </Route>
 
             <Route element={<ProtectedRoute roles={['admin', 'doctor', 'staff']} />}>
               <Route path="/patients" element={<Suspense fallback={fallback}><PatientsPage /></Suspense>} />

@@ -1,5 +1,5 @@
 import type { AppContext } from '../../context';
-import { adminUserIds, doctorUserIds, emitEvent, primaryDoctorUserIds, staffUserIds } from './service';
+import { adminUserIds, doctorUserIds, emitEvent, patientUserIds, primaryDoctorUserIds, staffUserIds } from './service';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any -- DB row
 
@@ -7,7 +7,7 @@ const money = (n: unknown) => `$${Number(n).toFixed(2)}`;
 
 async function appointmentFacts(ctx: AppContext, id: number): Promise<Row | undefined> {
   return ctx.db('appointments as a').join('patients as p', 'p.id', 'a.patient_id').join('doctors as d', 'd.id', 'a.doctor_id').where('a.id', id)
-    .first('a.id', 'a.date', 'a.time', 'a.doctor_id', 'p.fname', 'p.lname', 'd.fname as d_fname', 'd.lname as d_lname');
+    .first('a.id', 'a.date', 'a.time', 'a.doctor_id', 'a.patient_id', 'p.fname', 'p.lname', 'd.fname as d_fname', 'd.lname as d_lname');
 }
 
 /** A booked appointment: the staff and the doctor it is booked with (not the person who booked it). */
@@ -19,6 +19,12 @@ export async function appointmentBooked(ctx: AppContext, id: number, actorId: nu
     link: '/appointments', appointmentId: id, dedupeKey: `event:booked:${id}:${a.date}T${a.time}`,
     recipients: async () => [...(await staffUserIds(ctx.db)), ...(await doctorUserIds(ctx.db, a.doctor_id))],
   });
+  // The patient too, in the portal: their own appointment, in words they can read.
+  await emitEvent(ctx, {
+    type: 'appointment.booked', actorId, title: 'Your appointment', content: `Your appointment with Dr ${a.d_fname} ${a.d_lname} is booked for ${a.date} at ${a.time}.`,
+    link: '/my/appointments', appointmentId: id, dedupeKey: `event:booked:patient:${id}:${a.date}T${a.time}`,
+    recipients: () => patientUserIds(ctx.db, a.patient_id),
+  });
 }
 
 /** A cancelled appointment: the same people. */
@@ -29,6 +35,12 @@ export async function appointmentCancelled(ctx: AppContext, id: number, actorId:
     type: 'appointment.cancelled', actorId, title: 'Appointment cancelled', content: `${a.fname} ${a.lname} with Dr ${a.d_fname} ${a.d_lname} on ${a.date} at ${a.time} was cancelled.`,
     link: '/appointments', appointmentId: id, dedupeKey: `event:cancelled:${id}`,
     recipients: async () => [...(await staffUserIds(ctx.db)), ...(await doctorUserIds(ctx.db, a.doctor_id))],
+  });
+  // The patient, unless they cancelled it themselves (the actor is never told about their own action).
+  await emitEvent(ctx, {
+    type: 'appointment.cancelled', actorId, title: 'Appointment cancelled', content: `Your appointment with Dr ${a.d_fname} ${a.d_lname} on ${a.date} at ${a.time} was cancelled. Please call the clinic to book another.`,
+    link: '/my/appointments', appointmentId: id, dedupeKey: `event:cancelled:patient:${id}`,
+    recipients: () => patientUserIds(ctx.db, a.patient_id),
   });
 }
 

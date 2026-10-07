@@ -31,6 +31,11 @@ const SECTIONS: Record<string, string> = {
   '/settings/audit': 'Activity log',
   '/settings/trash': 'Trash',
   '/settings/procedures': 'Procedures',
+  '/my/appointments': 'My appointments',
+  '/my/treatment': 'My treatment',
+  '/my/payments': 'My payments',
+  '/my/documents': 'My documents',
+  '/my/profile': 'My profile',
 };
 
 /** Lists that the patient page opens filtered to one patient (`?patientId=`): their trail runs through the patient. */

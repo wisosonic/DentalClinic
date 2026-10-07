@@ -16,6 +16,7 @@ import { useGetConfigQuery, useListAppointmentsQuery } from '../features/clinica
 import { errorMessage } from '../lib/baseQuery';
 import { STATUS_HEX, formatDate, fullName } from '../lib/format';
 import { BRAND } from '../theme';
+import { PortalHome } from '../features/portal/PortalHome';
 
 // The charts load on demand so the dashboard opens fast.
 const InsightsSection = lazy(() => import('../features/dashboard/InsightsSection'));
@@ -140,9 +141,7 @@ export function DashboardPage() {
           {!unlinkedDoctor && <Suspense fallback={null}><InsightsSection /></Suspense>}
         </>
       ) : (
-        <Paper sx={{ p: 3, maxWidth: 560 }}>
-          <Typography>{t('The patient portal is coming soon. For now, please contact the clinic to book or change an appointment.')}</Typography>
-        </Paper>
+        <PortalHome />
       )}
     </>
   );

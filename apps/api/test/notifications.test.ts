@@ -43,11 +43,12 @@ const visit = async (time: string, status = 'confirmed', date = TODAY, doctor = 
 describe('reminders, two hours before', () => {
   it('go to the treating doctor and the staff, for a confirmed appointment starting within two hours', async () => {
     const a = await visit('11:30'); // 90 minutes from now
-    expect(await runReminders(ctx())).toBe(2);
+    expect(await runReminders(ctx())).toBe(3); // the doctor, the staff and (a day ahead is the patient's own reminder) the patient
     expect(await types(ayaUser)).toEqual(['appointment.reminder']);
     expect(await types(staffUser)).toEqual(['appointment.reminder']);
     expect(await types(adminUser)).toEqual([]);
     expect(await types(extUser)).toEqual([]); // another doctor's appointment
+    expect(await types(s.patientUserId)).toEqual(['appointment.reminder']);
     const n = await t.db('notifications').where({ user_id: staffUser }).first();
     expect(n).toMatchObject({ link: '/appointments', appointment_id: a, status: 'unread' });
     expect(n.content).toContain('Pat Patient');
@@ -61,23 +62,24 @@ describe('reminders, two hours before', () => {
     await visit('11:15', 'cancelled');
     const gone = await visit('11:45');
     await t.db('appointments').where({ id: gone }).update({ deleted_at: '2026-10-05 05:00:00' });
-    expect(await runReminders(ctx())).toBe(0);
-    expect(await t.db('notifications').count({ n: '*' }).first()).toMatchObject({ n: 0 });
+    expect(await runReminders(ctx())).toBe(1); // only the patient's day-ahead reminder for the 12:30 one: nobody at the clinic yet
+    expect(await types(ayaUser)).toEqual([]);
+    expect(await types(staffUser)).toEqual([]);
   });
 
   it('are sent once however often the job runs, and again if the appointment is moved', async () => {
     const a = await visit('11:30');
     await runReminders(ctx());
     expect(await runReminders(ctx())).toBe(0);
-    expect(await t.db('notifications').count({ n: '*' }).first()).toMatchObject({ n: 2 });
+    expect(await t.db('notifications').count({ n: '*' }).first()).toMatchObject({ n: 3 });
     await t.db('appointments').where({ id: a }).update({ time: '11:45' }); // rescheduled
-    expect(await runReminders(ctx())).toBe(2);
+    expect(await runReminders(ctx())).toBe(3);
   });
 
   it('include an appointment just after midnight when it is late in the evening', async () => {
     const late = { ...ctx(), clock: () => new Date('2026-10-05T20:30:00Z') }; // 23:30 in Beirut
     await visit('00:45', 'confirmed', TOMORROW);
-    expect(await runReminders(late)).toBe(2);
+    expect(await runReminders(late)).toBe(3);
   });
 
   it('stop when an admin switches reminders off', async () => {
@@ -85,7 +87,44 @@ describe('reminders, two hours before', () => {
     await admin.put('/settings/general', { language: 'en', timezone: 'Asia/Beirut', clinic: {}, notifications: { reminders: false, events: true } });
     expect(await runReminders(ctx())).toBe(0);
     await admin.put('/settings/general', { language: 'en', timezone: 'Asia/Beirut', clinic: {}, notifications: { reminders: true, events: true } });
-    expect(await runReminders(ctx())).toBe(2);
+    expect(await runReminders(ctx())).toBe(3);
+  });
+});
+
+describe('the patient’s own reminder, a day ahead', () => {
+  it('goes to the patient a day before a confirmed appointment, once, in words they can read, with a way to cancel', async () => {
+    const a = await visit('09:00', 'confirmed', TOMORROW); // 23 hours from now
+    expect(await runReminders(ctx())).toBe(1);
+    expect(await types(s.patientUserId)).toEqual(['appointment.reminder']);
+    expect(await types(ayaUser)).toEqual([]); // the doctor's own reminder is two hours ahead
+    const n = await t.db('notifications').where({ user_id: s.patientUserId }).first();
+    expect(n).toMatchObject({ link: '/my/appointments', appointment_id: a });
+    expect(n.content).toBe('You have an appointment with Dr Aya Ghali tomorrow at 09:00. To cancel it online, do it at least 24 hours ahead.');
+    expect(await runReminders(ctx())).toBe(0); // once
+    await t.db('appointments').where({ id: a }).update({ time: '09:15' });
+    expect(await runReminders(ctx())).toBe(1); // moved: told again
+  });
+
+  it('waits until it is within a day, and skips what is not confirmed, was deleted, or belongs to someone without a login', async () => {
+    await visit('11:00', 'confirmed', TOMORROW); // 25 hours away
+    await visit('09:00', 'pending', TOMORROW);
+    await visit('09:30', 'cancelled', TOMORROW);
+    const gone = await visit('10:30', 'confirmed', TOMORROW);
+    await t.db('appointments').where({ id: gone }).update({ deleted_at: '2026-10-05 05:00:00' });
+    await t.db('appointments').insert({ date: TOMORROW, time: '09:45', status: 'confirmed', patient_id: s.otherPatientId, doctor_id: s.doctorId, clinic_id: s.clinicId, unit_id: s.unitId, duration_minutes: 30, ...stamp });
+    expect(await runReminders(ctx())).toBe(0);
+    await t.db('users').where({ id: s.patientUserId }).update({ is_active: false });
+    await visit('09:50', 'confirmed', TOMORROW);
+    expect(await runReminders(ctx())).toBe(0); // a login that is switched off is not told
+    await t.db('users').where({ id: s.patientUserId }).update({ is_active: true });
+  });
+
+  it('follows the reminders switch', async () => {
+    await visit('09:00', 'confirmed', TOMORROW);
+    await admin.put('/settings/general', { language: 'en', timezone: 'Asia/Beirut', clinic: {}, notifications: { reminders: false, events: true } });
+    expect(await runReminders(ctx())).toBe(0);
+    await admin.put('/settings/general', { language: 'en', timezone: 'Asia/Beirut', clinic: {}, notifications: { reminders: true, events: true } });
+    expect(await runReminders(ctx())).toBe(1);
   });
 });
 
@@ -261,5 +300,55 @@ describe('the follow-up notification (no-show)', () => {
     expect(await types(adminUser)).toEqual([]);
     const n = await t.db('notifications').where({ user_id: ayaUser }).first();
     expect(n.content).toContain('missed the appointment');
+  });
+});
+
+describe('the patient is told about their own appointments', () => {
+  it('when the clinic books one, in plain words with a link to their appointments', async () => {
+    const res = await book(staff);
+    expect(res.status).toBe(201);
+    const n = await t.db('notifications').where({ user_id: s.patientUserId, type: 'appointment.booked' }).first();
+    expect(n).toMatchObject({ link: '/my/appointments', title: 'Your appointment' });
+    expect(n.content).toBe(`Your appointment with Dr Aya Ghali is booked for ${TOMORROW} at 10:00.`);
+  });
+
+  it('when the clinic cancels one, but not when the patient cancels it themselves', async () => {
+    const first = (await book(staff)).body.appointment.id as number;
+    await staff.post(`/appointments/${first}/cancel`);
+    const told = await t.db('notifications').where({ user_id: s.patientUserId, type: 'appointment.cancelled' });
+    expect(told).toHaveLength(1);
+    expect(told[0].content).toContain('was cancelled. Please call the clinic to book another.');
+
+    const second = (await book(staff, { time: '12:00' })).body.appointment.id as number;
+    await t.db('notifications').where({ user_id: s.patientUserId }).del();
+    expect((await patient.post(`/appointments/${second}/cancel`)).status).toBe(200);
+    expect(await types(s.patientUserId)).toEqual([]); // nobody is told about their own action
+    expect(await types(staffUser)).toContain('appointment.cancelled'); // the clinic is
+  });
+
+  it('not another patient’s, and not a login that is switched off', async () => {
+    await book(staff, { patientId: s.otherPatientId });
+    expect(await types(s.patientUserId)).toEqual([]);
+    await t.db('users').where({ id: s.patientUserId }).update({ is_active: false });
+    await book(staff, { time: '14:00' });
+    expect(await types(s.patientUserId)).toEqual([]);
+    await t.db('users').where({ id: s.patientUserId }).update({ is_active: true });
+  });
+});
+
+describe('the patient’s own list', () => {
+  it('shows a patient only their own notifications, and lets them mark them read', async () => {
+    await visit('09:00', 'confirmed', TOMORROW);
+    await visit('11:30'); // today: the staff and the doctor are reminded too
+    await runReminders(ctx());
+    const mine = (await patient.get('/notifications')).body;
+    expect(mine.data.map((n: { link: string }) => n.link)).toEqual(['/my/appointments', '/my/appointments']); // a day-ahead reminder for each, in their own words
+    expect(mine.unread).toBe(2);
+    expect(mine.data[0].link).toBe('/my/appointments');
+    expect((await staff.get('/notifications')).body.data.some((n: { link: string }) => n.link === '/my/appointments')).toBe(false); // never the patient's
+    expect((await patient.agent.patch(`/api/v1/notifications/${mine.data[0].id}/read`).set('x-csrf-token', patient.csrf)).status).toBe(200);
+    expect((await patient.get('/notifications')).body.unread).toBe(1);
+    const staffNote = (await staff.get('/notifications')).body.data[0];
+    expect((await patient.agent.patch(`/api/v1/notifications/${staffNote.id}/read`).set('x-csrf-token', patient.csrf)).status).toBe(404); // someone else's is none
   });
 });

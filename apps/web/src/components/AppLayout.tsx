@@ -60,7 +60,7 @@ export function AppLayout() {
           )}
           {!desktop && <BrandLogo size={32} showName={false} />}
           <Box sx={{ flexGrow: 1 }} />
-          {user && user.role !== 'patient' && <NotificationBell />}
+          {user && <NotificationBell />}
           <LanguageSwitch />
           {user?.role === 'admin' && (
             <Tooltip title={t('Settings')}>

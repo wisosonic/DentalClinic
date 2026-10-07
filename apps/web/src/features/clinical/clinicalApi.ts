@@ -227,6 +227,11 @@ export const clinicalApi = api.injectEndpoints({
       query: (p) => ({ url: '/patients', ...qs(p ?? {}) }),
       providesTags: ['Patient'],
     }),
+    getMyPatient: build.query<PatientDto, void>({
+      query: () => '/patients/me',
+      transformResponse: (r: { patient: PatientDto }) => r.patient,
+      providesTags: ['Patient'],
+    }),
     getPatient: build.query<PatientDto, number>({
       query: (id) => `/patients/${id}`,
       transformResponse: (r: { patient: PatientDto }) => r.patient,
@@ -419,6 +424,7 @@ export const {
   useCreateAppointmentMutation,
   useUpdateAppointmentMutation,
   useAppointmentActionMutation,
+  useGetMyPatientQuery,
   useGetDoctorsQuery,
   useCreateDoctorMutation,
   useUpdateDoctorMutation,
