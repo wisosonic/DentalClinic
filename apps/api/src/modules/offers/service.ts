@@ -85,7 +85,7 @@ export async function toOfferDtos(db: Db | Conn, rows: Row[], user: AuthUser, wi
     return {
       id: r.id, patientId: r.patient_id, patient: { id: r.patient_id, fname: r.p_fname, lname: r.p_lname },
       doctor: r.p_doctor_id ? { id: r.p_doctor_id, fname: r.d_fname, lname: r.d_lname } : null,
-      title: r.title, description: r.description ?? null, startDate: r.start_date ?? null, notes: r.notes ?? null, status: r.status as OfferStatus,
+      title: r.title, description: r.description ?? null, notes: r.notes ?? null, status: r.status as OfferStatus,
       price, ...(seesCost(user) && { cost: round2(Number(r.cost ?? 0)) }), currency: r.currency, paid, remaining: Math.max(0, round2(price - paid)),
       paymentState: paymentStateOf(price, paid), workState: workStateOf(mine),
       progress: { done, total: mine.length, percent: mine.length ? Math.round((done / mine.length) * 100) : 0 },

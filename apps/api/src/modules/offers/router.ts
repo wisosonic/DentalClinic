@@ -157,7 +157,7 @@ export function offersRouter(ctx: AppContext): Router {
     const id = await db.transaction(async (trx) => {
       const [offerId] = await trx('treatment_offers').insert({
         title: input.title, description: input.description ?? null, type: 'clinic', price: 0, cost: 0, currency: '$', status: input.asDraft ? 'draft' : 'accepted', patient_id: patient.id,
-        doctor_id: patient.doctor_id ?? null, start_date: input.startDate ?? null, notes: input.notes ?? null, created_at: now, updated_at: now,
+        doctor_id: patient.doctor_id ?? null, notes: input.notes ?? null, created_at: now, updated_at: now,
       });
       if (items.length) {
         await trx('offer_items').insert(items.map((i, n) => ({
@@ -181,7 +181,6 @@ export function offersRouter(ctx: AppContext): Router {
     await db('treatment_offers').where({ id }).update({
       ...(input.title !== undefined && { title: input.title }),
       ...(input.description !== undefined && { description: input.description }),
-      ...(input.startDate !== undefined && { start_date: input.startDate }),
       ...(input.notes !== undefined && { notes: input.notes }),
       updated_at: sqlNow(),
     });

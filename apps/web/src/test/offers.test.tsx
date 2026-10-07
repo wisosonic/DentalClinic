@@ -15,7 +15,7 @@ const item = (extra: object = {}) => ({
 });
 const offer = (extra: object = {}) => ({
   id: 9, patientId: 7, patient: { id: 7, fname: 'Hicham', lname: 'Cheaib' }, doctor: { id: 1, fname: 'Aya', lname: 'Al Ghali' }, title: 'Full rehabilitation', description: null,
-  status: 'accepted', startDate: null, notes: null, price: 420.5, cost: 140.25, currency: '$', paid: 0, remaining: 420.5, paymentState: 'unpaid', workState: 'not_started',
+  status: 'accepted', notes: null, price: 420.5, cost: 140.25, currency: '$', paid: 0, remaining: 420.5, paymentState: 'unpaid', workState: 'not_started',
   progress: { done: 0, total: 2, percent: 0 }, createdAt: '2026-10-01 09:00:00',
   items: [item(), item({ id: 2, sequence: 2, description: 'Crown', category: null, tooth: null, price: 300.5, cost: 100.25 })], ...extra,
 });

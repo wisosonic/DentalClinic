@@ -18,7 +18,6 @@ Last updated 2026-10-06, after phase 7 and its follow-ups, editable roles, treat
 Phase 7 is built (see CLAUDE.md). Left:
 
 - [ ] Reminders and notifications for **patients**: the owner will decide in phase 8 how patient accounts are provided; nothing is built until then (the generator already supports it)
-- [ ] **Owner: confirm two assumptions in the new notifications.** Commission is called overdue after **30 days** (owed, oldest collection older than 30 days, nothing paid for 30 days); a treatment plan visit is "due" when the plan's **start date** has come and nothing is booked (plan items have no due dates; a plan with no start date is never reported)
 
 ---
 

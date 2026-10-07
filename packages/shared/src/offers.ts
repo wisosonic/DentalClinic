@@ -1,11 +1,10 @@
 import { z } from 'zod';
-import { dateSchema, idSchema } from './clinical';
+import { idSchema } from './clinical';
 import { moneySchema } from './finance';
 
 const text = (max: number) => z.string().trim().max(max);
 const optionalText = (max: number) =>
   z.preprocess((v) => (typeof v === 'string' && v.trim() === '' ? null : v), text(max).nullable().optional());
-const optionalDate = z.preprocess((v) => (v === '' ? null : v), dateSchema.nullable().optional());
 // the form's selects hold ids as strings, so coerce (a string id used to fail here with no field to show it on)
 const optionalId = z.preprocess((v) => (v === '' || v === 0 || v === '0' ? null : v), z.coerce.number().int().positive().nullable().optional());
 
@@ -52,7 +51,6 @@ export const offerInputSchema = z.object({
   patientId: idSchema,
   title: text(255).min(1, 'Title is required'),
   description: optionalText(255),
-  startDate: optionalDate,
   notes: optionalText(5000),
   items: z.array(offerItemInputSchema).max(60).default([]),
   /** Keep it as an unfinished draft instead of making it final (needs no items). */
@@ -64,7 +62,6 @@ export const offerUpdateSchema = z
   .object({
     title: text(255).min(1, 'Title is required'),
     description: optionalText(255),
-    startDate: optionalDate,
     notes: optionalText(5000),
   })
   .partial()
@@ -96,7 +93,6 @@ export interface OfferDto {
   doctor: { id: number; fname: string; lname: string } | null;
   title: string;
   description: string | null;
-  startDate: string | null;
   notes: string | null;
   status: OfferStatus;
   /** The sum of the items' prices. */

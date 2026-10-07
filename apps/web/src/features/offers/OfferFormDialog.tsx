@@ -50,7 +50,6 @@ export function OfferFormDialog({
   const [patient, setPatient] = useState<PatientDto | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [startDate, setStartDate] = useState('');
   const [notes, setNotes] = useState('');
   const [items, setList] = useState<ItemDraft[]>([]);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -64,7 +63,6 @@ export function OfferFormDialog({
     setPatient(preset ?? null);
     setTitle(offer?.title ?? '');
     setDescription(offer?.description ?? '');
-    setStartDate(offer?.startDate ?? '');
     setNotes(offer?.notes ?? '');
     setList(
       offer?.items?.length
@@ -105,7 +103,7 @@ export function OfferFormDialog({
       return;
     }
     const draft = {
-      patientId: offer?.patientId ?? patient?.id, title, description, startDate, notes, ...(asDraft && { asDraft: true }),
+      patientId: offer?.patientId ?? patient?.id, title, description, notes, ...(asDraft && { asDraft: true }),
       items: (offer ? items : filled).map((i) => ({
         id: i.id, description: i.description, categoryId: i.categoryId || null, toothId: i.toothId || null, price: i.price === '' ? 0 : i.price, cost: i.cost === '' ? null : i.cost,
       })),
@@ -121,7 +119,7 @@ export function OfferFormDialog({
       if (result.data) { onSaved?.(result.data); onClose(); }
       return;
     }
-    const changed = await update({ id: offer.id, body: { title: data.title, description: data.description ?? null, startDate: data.startDate ?? null, notes: data.notes ?? null } });
+    const changed = await update({ id: offer.id, body: { title: data.title, description: data.description ?? null, notes: data.notes ?? null } });
     if ('error' in changed && changed.error) return;
     const saved = await setItems({ id: offer.id, items: data.items });
     if (saved.data) { onSaved?.(saved.data); onClose(); }
@@ -144,9 +142,6 @@ export function OfferFormDialog({
         )}
         <TextField label={t('Title')} value={title} required onChange={(e) => { setTitle(e.target.value); clear('title'); }} {...field('title')} />
         <TextField label={t('Description (optional)')} value={description} onChange={(e) => setDescription(e.target.value)} {...field('description')} />
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', columnGap: 2 }}>
-          <TextField label={t('Start date (optional)')} type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} {...field('startDate')} />
-        </Box>
 
         <Typography variant="subtitle1" sx={{ mt: 1, mb: 1, fontWeight: 700 }}>{t('Work to do, in order')}</Typography>
         {errors.items && <Alert severity="error" sx={{ mb: 1 }} role="alert">{errors.items}</Alert>}

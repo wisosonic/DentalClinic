@@ -292,6 +292,7 @@ describe('migration 020: treatment plans and quotes become treatment offers', ()
     expect([await byTitle('sent'), await byTitle('rejected'), await byTitle('expired'), await byTitle('draft'), await byTitle('accepted'), await byTitle('cancelled')])
       .toEqual(['accepted', 'cancelled', 'cancelled', 'draft', 'accepted', 'cancelled']);
     expect(await db('treatment_offers').where({ title: 'Bridge' }).first()).toMatchObject({ status: 'accepted' }); // the migrated pending one
+    await db.migrate.down(migrationConfig); // 025 puts the start date column back
     await db.migrate.down(migrationConfig); // 024 renames the columns back
     await db.migrate.down(migrationConfig); // 023 renames the table back
     await expect(db.migrate.down(migrationConfig)).rejects.toThrow(/Rolling back migration 022 is not supported/);
@@ -313,7 +314,9 @@ describe('migration 020: treatment plans and quotes become treatment offers', ()
     const names = ((await db.raw("SELECT name FROM sqlite_master WHERE type = 'index'")) as { name: string }[]).map((r) => r.name);
     expect(names.filter((n) => n.includes('quote'))).toEqual([]);
     expect(names).toEqual(expect.arrayContaining(['treatment_offers_patient_id_index', 'payments_offer_id_index', 'appointments_offer_id_index']));
-    // 024 and 023 roll back, and go forward again, with the data intact
+    expect(Object.keys(await db('treatment_offers').columnInfo())).not.toContain('start_date'); // 025: an offer has no start date
+    // 025, 024 and 023 roll back, and go forward again, with the data intact
+    await db.migrate.down(migrationConfig);
     await db.migrate.down(migrationConfig);
     await db.migrate.down(migrationConfig);
     expect(await db('payments').where({ quote_id: id }).count({ n: '*' }).first()).toMatchObject({ n: 1 });

@@ -124,7 +124,6 @@ export function OfferDetailPage() {
             <Typography variant="caption" color="text.secondary">{t('Work')}</Typography>
             <LinearProgress variant="determinate" value={offer.progress.percent} aria-label={t('Progress of {{title}}', { title: offer.title })} sx={{ height: 8, my: 0.75 }} />
             <Typography variant="body2">{t('{{done}} of {{total}} done', { done: offer.progress.done, total: offer.progress.total })}</Typography>
-            {offer.startDate && <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{t('Start date')}: {formatDate(offer.startDate)}</Typography>}
           </Box>
         </Stack>
         {offer.description && <Typography sx={{ mt: 1.5 }}>{offer.description}</Typography>}

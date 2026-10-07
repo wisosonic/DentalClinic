@@ -23,6 +23,7 @@ import * as m021 from './migrations/021_patient_documents';
 import * as m022 from './migrations/022_offer_statuses';
 import * as m023 from './migrations/023_rename_quotes';
 import * as m024 from './migrations/024_rename_offer_columns';
+import * as m025 from './migrations/025_drop_offer_start_date';
 
 type Migration = { up(k: Knex): Promise<void>; down(k: Knex): Promise<void> };
 
@@ -52,6 +53,7 @@ const migrations: Record<string, Migration> = {
   '022_offer_statuses': m022,
   '023_rename_quotes': m023,
   '024_rename_offer_columns': m024,
+  '025_drop_offer_start_date': m025,
 };
 
 const migrationSource: Knex.MigrationSource<string> = {

@@ -70,7 +70,7 @@ export interface PublicSettingsDto {
 
 export const NOTIFICATION_TYPES = [
   'appointment.reminder', 'appointment.booked', 'appointment.cancelled', 'offer.accepted', 'payment.received', 'lab.overdue',
-  'appointment.no_show', 'commission.overdue', 'offer.visit_due', 'report.ready',
+  'appointment.no_show', 'report.ready',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

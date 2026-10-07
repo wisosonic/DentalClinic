@@ -176,9 +176,9 @@ describe('creating and reading offers', () => {
 });
 
 describe('editing an offer', () => {
-  it('changes title, description, start date and notes, but not once it is closed', async () => {
+  it('changes title, description and notes, but not once it is closed', async () => {
     const id = (await created()).id;
-    expect((await aya.patch(`/treatment-offers/${id}`, { title: 'New title', description: 'Short', startDate: '2026-11-01', notes: 'Slowly' })).body.offer).toMatchObject({ title: 'New title', description: 'Short', startDate: '2026-11-01', notes: 'Slowly' });
+    expect((await aya.patch(`/treatment-offers/${id}`, { title: 'New title', description: 'Short', notes: 'Slowly' })).body.offer).toMatchObject({ title: 'New title', description: 'Short', notes: 'Slowly' });
     expect((await aya.patch(`/treatment-offers/${id}`, {})).status).toBe(400);
     expect((await staff.patch(`/treatment-offers/${id}`, { title: 'x' })).status).toBe(403);
     await aya.post(`/treatment-offers/${id}/cancel`);

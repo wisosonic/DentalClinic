@@ -1,8 +1,8 @@
 import http from 'node:http';
 import { pino } from 'pino';
 import bcrypt from 'bcryptjs';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { runCommissionOverdue, runOverdueLabs, runOfferVisitsDue, runReminders } from '../src/jobs/notifications';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { runOverdueLabs, runReminders } from '../src/jobs/notifications';
 import { notificationBus } from '../src/modules/notifications/service';
 import { NOW, PASSWORD, TODAY, TOMORROW, buildTestApp, loggedIn, seedClinic, type Client, type Seed, type TestApp } from './helpers';
 
@@ -252,7 +252,7 @@ describe('the live stream', () => {
   });
 });
 
-describe('the follow-up notifications (no-show, overdue commission, offer visits to book)', () => {
+describe('the follow-up notification (no-show)', () => {
   it('tell the staff and the doctor about a missed appointment, but not the person who marked it', async () => {
     const a = await visit('09:00', 'confirmed', TODAY);
     expect((await staff.post(`/appointments/${a}/no-show`)).status).toBe(200);
@@ -261,80 +261,5 @@ describe('the follow-up notifications (no-show, overdue commission, offer visits
     expect(await types(adminUser)).toEqual([]);
     const n = await t.db('notifications').where({ user_id: ayaUser }).first();
     expect(n.content).toContain('missed the appointment');
-  });
-
-  describe('commission overdue', () => {
-    let extPatient: number;
-    beforeEach(async () => {
-      extPatient = (await t.db('patients').insert({ patient_identifier: 'E9', fname: 'Ext', lname: 'Pat', phone: '709', doctor_id: s.externalDoctorId, ...stamp }))[0]!;
-      await t.db('doctors').where({ id: s.externalDoctorId }).update({ commission_percent: 30 });
-      await t.db('appointments').insert({ date: '2026-08-01', time: '10:00', status: 'completed', patient_id: extPatient, doctor_id: s.externalDoctorId, clinic_id: s.clinicId, unit_id: s.unitId, duration_minutes: 30, ...stamp });
-    });
-    afterEach(async () => {
-      await t.db('payments').del();
-      await t.db('treatment_offers').del();
-      await t.db('appointments').where({ patient_id: extPatient }).del();
-      await t.db('patients').where({ id: extPatient }).del();
-    });
-    const collect = async (date: string, amount: number) => {
-      const quote = (await t.db('treatment_offers').insert({ title: 'Bridge', type: 'clinic', price: 1000, cost: 0, currency: '$', status: 'accepted', patient_id: extPatient, ...stamp }))[0]!;
-      await t.db('payments').insert({ date, type: 'clinic', amount, currency: '$', offer_id: quote, collected_by_doctor_id: s.externalDoctorId, dr_part: 100, ...stamp });
-    };
-
-    it('reminds the owner and the admins once a month when a specialist has owed him for over 30 days', async () => {
-      await collect('2026-08-20', 200); // 46 days ago: owes 60
-      expect(await runCommissionOverdue(ctx())).toBe(3); // two admins and the owner
-      expect(await types(ayaUser)).toEqual(['commission.overdue']);
-      expect(await types(adminUser)).toEqual(['commission.overdue']);
-      expect(await types(staffUser)).toEqual([]);
-      const n = await t.db('notifications').where({ user_id: ayaUser }).first();
-      expect(n.content).toContain('$60.00');
-      expect(n.link).toBe('/commission');
-      expect(await runCommissionOverdue(ctx())).toBe(0); // once this month
-    });
-
-    it('stays quiet when it is recent, paid up, partly paid lately, unknown or switched off', async () => {
-      await collect('2026-09-25', 200); // only 10 days old
-      expect(await runCommissionOverdue(ctx())).toBe(0);
-      await collect('2026-08-20', 200);
-      await t.db('payments').insert({ date: '2026-09-30', type: 'commission', amount: 10, currency: '$', model_id: s.externalDoctorId, collected_by_doctor_id: s.doctorId, dr_part: 100, ...stamp });
-      expect(await runCommissionOverdue(ctx())).toBe(0); // he paid something five days ago
-      await t.db('payments').where({ type: 'commission' }).update({ date: '2026-08-25', amount: 120 }); // 40 days ago, and the full 120 owed
-      expect(await runCommissionOverdue(ctx())).toBe(0); // nothing left to owe
-      await t.db('payments').where({ type: 'commission' }).update({ amount: 20 });
-      await t.db('doctors').where({ id: s.externalDoctorId }).update({ commission_percent: null });
-      expect(await runCommissionOverdue(ctx())).toBe(0); // no percentage: the statement's own warning covers it
-      await t.db('doctors').where({ id: s.externalDoctorId }).update({ commission_percent: 30 });
-      await admin.put('/settings/general', { language: 'en', timezone: 'Asia/Beirut', clinic: {}, notifications: { reminders: true, events: false } });
-      expect(await runCommissionOverdue(ctx())).toBe(0);
-    });
-  });
-
-  describe('an offer visit to book', () => {
-    const plan = async (extra: object = {}, items: { description: string; status: string }[] = [{ description: 'Crown 16', status: 'pending' }]) => {
-      const id = (await t.db('treatment_offers').insert({ patient_id: s.patientId, title: 'Rehab', type: 'clinic', price: 10, cost: 0, currency: '$', status: 'accepted', start_date: '2026-10-01', ...stamp, ...extra }))[0]!;
-      for (const [i, it] of items.entries()) await t.db('offer_items').insert({ offer_id: id, description: it.description, status: it.status, sequence: i, price: 10, ...stamp });
-      return id;
-    };
-
-    it('tells the staff and the patient’s doctor once, when an accepted offer has started and nothing is booked', async () => {
-      const id = await plan({}, [{ description: 'Scaling', status: 'done' }, { description: 'Crown 16', status: 'pending' }, { description: 'Crown 17', status: 'pending' }]);
-      expect(await runOfferVisitsDue(ctx())).toBe(2); // staff and the doctor
-      expect(await types(staffUser)).toEqual(['offer.visit_due']);
-      expect(await types(ayaUser)).toEqual(['offer.visit_due']);
-      const n = await t.db('notifications').where({ user_id: staffUser }).first();
-      expect(n.content).toContain('Crown 16');
-      expect(n.link).toBe(`/treatment-offers/${id}`);
-      expect(await runOfferVisitsDue(ctx())).toBe(0); // once per next item
-    });
-
-    it('leaves alone an offer with a visit booked, no start date, a start in the future, not accepted, or nothing left to book', async () => {
-      await plan({}, [{ description: 'A', status: 'scheduled' }, { description: 'B', status: 'pending' }]);
-      await plan({ start_date: null });
-      await plan({ start_date: '2026-10-06' });
-      await plan({ status: 'sent' });
-      await plan({}, [{ description: 'C', status: 'done' }]);
-      expect(await runOfferVisitsDue(ctx())).toBe(0);
-    });
   });
 });
