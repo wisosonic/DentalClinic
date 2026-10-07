@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, TextField } from '@mui/material';
+import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, TextField, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { GENDERS, patientInputSchema, type PatientDto } from '@aya/shared';
 import { useRole } from '../../components/useRole';
@@ -107,6 +107,11 @@ export function PatientFormDialog({ open, onClose, patient, onSaved }: Props) {
             {t('A patient with this name and phone number already exists.')}
           </Alert>
         )}
+        {patient?.username ? (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{t('Username')}: <bdi dir="ltr">{patient.username}</bdi> {t('(made from the name when the patient was registered; it does not change)')}</Typography>
+        ) : !patient ? (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{t('A unique username is made from the name when the patient is saved.')}</Typography>
+        ) : null}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', columnGap: 16 }}>
           {field('fname', t('First name'), { autoFocus: true, required: true })}
           {field('lname', t('Last name'), { required: true })}

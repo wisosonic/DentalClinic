@@ -34,7 +34,7 @@ The documents, their previews and the "visible to the patient" mark are built (s
 ## Phase 8: Patient portal
 
 - [ ] **Timeline history:** the patient sees their appointments as a timeline, newest first, each expandable to its report (summary and prescriptions only); links to the printable visit summary
-- [ ] Staff action "invite to portal" (`POST /patients/:id/account`): creates the login, links `patients.user_id`, and shows staff a one-time link or temporary password to hand to the patient
+- [ ] Patients who forget their password: staff make a new card (built), or an admin hands a one-time link from *Users*; decide with the owner whether the portal also needs a self-service reset (the clinic sends no email)
 - [ ] Portal UI (English and Arabic; use the existing translation layer), view only: upcoming appointments with a cancel button (24 h notice) and balance, NO booking (patients phone the clinic), own appointments, plans, quotes, payments, profile
 - [ ] Patient view of own visit summary PDF
 - [ ] Mobile polish; optionally installable (PWA)

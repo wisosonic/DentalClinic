@@ -55,7 +55,7 @@ export function renderApp(ui: ReactElement, path = '/') {
 
 export const PATIENT = {
   id: 7, patientIdentifier: '100007', fname: 'Hicham', lname: 'Cheaib', phone: '03039198', dateOfBirth: null, gender: 'male',
-  email: null, address: null, lastVisit: '2025-11-02 12:56:20', description: null, doctorId: 1, hasAccount: false, createdAt: null,
+  email: null, address: null, lastVisit: '2025-11-02 12:56:20', description: null, doctorId: 1, username: 'hicham.cheaib', hasAccount: false, createdAt: null,
 };
 
 export const CLINIC = { id: 1, name: 'Aya Ghali Clinic', phone: null, address: 'Karakol', type: null, latitude: null, longitude: null };

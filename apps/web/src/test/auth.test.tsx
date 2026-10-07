@@ -89,7 +89,7 @@ describe('login form', () => {
     unauthenticated();
     renderAt('/login');
     await userEvent.click(await screen.findByRole('button', { name: 'Sign in' }));
-    expect(await screen.findByText('Enter a valid email address')).toBeInTheDocument();
+    expect(await screen.findByText('Enter your email or username')).toBeInTheDocument();
     expect(calls.some((c) => c.path === '/auth/login')).toBe(false);
   });
 
@@ -98,25 +98,25 @@ describe('login form', () => {
     routes['POST /auth/login'] = () => json(200, { user: USER });
     renderAt('/login');
 
-    await userEvent.type(await screen.findByLabelText('Email'), 'aya@clinic.test');
+    await userEvent.type(await screen.findByLabelText('Email or username'), 'aya@clinic.test');
     await userEvent.type(screen.getByLabelText('Password'), 'Correct-Horse-9');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
     expect(await screen.findByText(/Welcome, Dr. Aya Ghali/)).toBeInTheDocument();
     const login = calls.find((c) => c.path === '/auth/login')!;
-    expect(login.body).toEqual({ email: 'aya@clinic.test', password: 'Correct-Horse-9', remember: false });
+    expect(login.body).toEqual({ identifier: 'aya@clinic.test', password: 'Correct-Horse-9', remember: false });
   });
 
   it('shows the server’s error and stays on the page', async () => {
     unauthenticated();
-    routes['POST /auth/login'] = () => json(401, { error: { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' } });
+    routes['POST /auth/login'] = () => json(401, { error: { code: 'INVALID_CREDENTIALS', message: 'Invalid email, username or password' } });
     renderAt('/login');
 
-    await userEvent.type(await screen.findByLabelText('Email'), 'aya@clinic.test');
+    await userEvent.type(await screen.findByLabelText('Email or username'), 'aya@clinic.test');
     await userEvent.type(screen.getByLabelText('Password'), 'wrong');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email or password');
+    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid email, username or password');
     // A failed login must not be mistaken for an expired token and trigger a refresh.
     expect(calls.some((c) => c.path === '/auth/refresh' && c.method === 'POST' && calls.indexOf(c) > calls.findIndex((x) => x.path === '/auth/login'))).toBe(false);
   });
@@ -126,7 +126,7 @@ describe('login form', () => {
     unauthenticated();
     routes['POST /auth/login'] = () => json(200, { user: USER });
     renderAt('/login');
-    await userEvent.type(await screen.findByLabelText('Email'), 'aya@clinic.test');
+    await userEvent.type(await screen.findByLabelText('Email or username'), 'aya@clinic.test');
     await userEvent.type(screen.getByLabelText('Password'), 'Correct-Horse-9');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     await waitFor(() => expect(calls.some((c) => c.path === '/auth/login')).toBe(true));

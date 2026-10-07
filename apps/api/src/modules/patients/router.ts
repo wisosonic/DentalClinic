@@ -2,6 +2,13 @@ import { randomInt } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import { STAFF_ROLES, patientInputSchema, patientUpdateSchema, type PatientDto, type Paginated } from '@aya/shared';
+import { hashPassword } from '../../lib/password';
+import { generatePassword } from '../../lib/crypto';
+import { patientLoginEmail, uniqueUsername, usernameBase } from '../../lib/username';
+import { limiter } from '../../middleware/rateLimit';
+import { clinicLetterhead } from '../finance/letterhead';
+import { revokeAllForUser } from '../auth/session';
+import { renderPatientCard } from './card';
 import type { AppContext } from '../../context';
 import { sqlNow } from '../../db/connection';
 import { HttpError, badRequest, forbidden, notFound } from '../../lib/errors';
@@ -34,6 +41,7 @@ const timelineQuery = z.object({
 });
 
 const createQuery = z.object({ allowDuplicate: z.enum(['true', 'false']).optional() });
+const cardBody = z.object({ reset: z.boolean().optional() }).strict();
 
 export function toPatientDto(row: Row, user: AuthUser): PatientDto {
   return {
@@ -50,6 +58,7 @@ export function toPatientDto(row: Row, user: AuthUser): PatientDto {
     // Internal notes stay inside the clinic.
     ...(user.role !== 'patient' ? { description: row.description ?? null } : {}),
     doctorId: row.doctor_id ?? null,
+    username: row.username ?? null,
     hasAccount: row.user_id != null,
     createdAt: row.created_at ?? null,
   };
@@ -75,6 +84,13 @@ export function patientsRouter(ctx: AppContext): Router {
     const row = await find(id);
     if (!row || !ownsPatient(await doctorScope(db, user), row.doctor_id)) throw notFound('Patient not found');
     return row;
+  }
+
+  /** No login yet, a login whose first (card) password has not been changed, or a login in use. */
+  async function loginStateOf(row: Row): Promise<'none' | 'waiting' | 'active'> {
+    if (row.user_id == null) return 'none';
+    const login = await db('users').where({ id: row.user_id }).first('change_password');
+    return !login ? 'none' : login.change_password ? 'waiting' : 'active';
   }
 
   async function validateRefs(input: { doctorId?: number | null; dateOfBirth?: string | null }) {
@@ -164,11 +180,14 @@ export function patientsRouter(ctx: AppContext): Router {
       created_at: now, updated_at: now,
     };
 
-    // The identifier is random and 6 digits (as in the existing data); retry on the rare collision.
+    // The identifier is random and 6 digits (as in the existing data); retry on the rare collision. The username
+    // (made from the name, unique) is chosen again on each try, so two registrations at once cannot share one.
     let id: number | undefined;
     for (let attempt = 0; attempt < 10 && !id; attempt++) {
       try {
-        [id] = (await db('patients').insert({ ...values, patient_identifier: String(randomInt(100000, 1000000)) })) as number[];
+        const patient_identifier = String(randomInt(100000, 1000000));
+        const username = await uniqueUsername(db, usernameBase(input.fname, input.lname, patient_identifier));
+        [id] = (await db('patients').insert({ ...values, patient_identifier, username })) as number[];
       } catch (err) {
         if (!isUniqueError(err)) throw err;
       }
@@ -176,7 +195,7 @@ export function patientsRouter(ctx: AppContext): Router {
     if (!id) throw new HttpError(500, 'IDENTIFIER_FAILED', 'Could not generate a patient number, please try again');
 
     await audit(ctx, req, { userId: user.id, action: 'patient.create', entity: 'patient', entityId: id });
-    res.status(201).json({ patient: toPatientDto((await find(id))!, user) });
+    res.status(201).json({ patient: { ...toPatientDto((await find(id))!, user), loginState: 'none' } });
   });
 
   router.get('/:id', requirePermission('patients:read'), async (req, res) => {
@@ -185,7 +204,9 @@ export function patientsRouter(ctx: AppContext): Router {
     await assertPatientAccess(db, user, id);
     const row = await findVisible(user, id);
     await auditView(ctx, req, { user, action: 'patient.view', patientId: id });
-    res.json({ patient: toPatientDto(row, user) });
+    const dto = toPatientDto(row, user);
+    if (user.role !== 'patient') dto.loginState = await loginStateOf(row);
+    res.json({ patient: dto });
   });
 
   router.get('/:id/timeline', requirePermission('patients:read'), async (req, res) => {
@@ -225,6 +246,64 @@ export function patientsRouter(ctx: AppContext): Router {
     await audit(ctx, req, { userId: user.id, action: 'patient.update', entity: 'patient', entityId: id, diff: { fields: Object.keys(input) } });
     res.json({ patient: toPatientDto((await find(id))!, user) });
   });
+
+  // The patient card: creates the patient's login (their username and a first, temporary password) the first
+  // time, or replaces the first password while it has not been changed. Once the patient has chosen their own
+  // password, a new card needs `reset: true`, which replaces it and signs them out everywhere. The password is
+  // on the printout only: the database keeps its hash, and neither the log nor any answer repeats it.
+  router.post(
+    '/:id/card', requireRole(...STAFF_ROLES), requirePermission('patients:update'),
+    limiter(env, { windowMs: 60_000, limit: 30, message: 'Too many cards. Please wait a minute.' }),
+    async (req, res) => {
+      const user = requireUser(req);
+      const id = idParam.parse(req.params.id);
+      const body = cardBody.parse(req.body ?? {});
+      const patient = await findVisible(user, id);
+
+      let username: string | null = patient.username ?? null;
+      if (!username) {
+        username = await uniqueUsername(db, usernameBase(patient.fname, patient.lname, patient.patient_identifier)); // a record from before usernames
+      }
+      const login: Row | undefined = patient.user_id ? await db('users').where({ id: patient.user_id }).first() : undefined;
+      if (login && !login.is_active) throw new HttpError(409, 'ACCOUNT_DISABLED', 'The patient’s login is switched off: an administrator can switch it on under Users');
+      const reset = Boolean(login && !login.change_password);
+      if (reset && !body.reset) throw new HttpError(409, 'PASSWORD_ALREADY_CHANGED', 'The patient has already chosen their own password');
+
+      const password = generatePassword(12);
+      const doctor: Row | undefined = patient.doctor_id ? await db('doctors').where({ id: patient.doctor_id }).first('fname', 'lname') : undefined;
+      const pdf = await renderPatientCard(
+        {
+          clinic: await clinicLetterhead(db, id),
+          patient: { name: `${patient.fname} ${patient.lname}`.trim(), number: patient.patient_identifier, dateOfBirth: patient.date_of_birth ?? null, phone: patient.phone ?? null, doctor: doctor ? `${doctor.fname} ${doctor.lname}`.trim() : null },
+          username, password, signInUrl: env.APP_URL, issuedOn: clinicNow(env, ctx.clock()).date,
+        },
+        { compress: env.NODE_ENV !== 'test' },
+      );
+
+      const now = sqlNow();
+      const hash = await hashPassword(password, env.BCRYPT_COST);
+      await db.transaction(async (trx) => {
+        if (!login) {
+          const [userId] = (await trx('users').insert({
+            name: `${patient.fname} ${patient.lname}`.trim(), email: patientLoginEmail(username!), username, password: hash, role: 'patient',
+            change_password: true, is_active: true, created_at: now, updated_at: now,
+          })) as number[];
+          const linked = await trx('patients').where({ id }).whereNull('user_id').update({ user_id: userId, username, updated_at: now });
+          if (!linked) throw new HttpError(409, 'CARD_CONFLICT', 'Someone else just made this patient a card: try again');
+        } else {
+          await trx('users').where({ id: login.id }).update({ password: hash, change_password: true, failed_logins: 0, locked_until: null, updated_at: now });
+          if (!patient.username) await trx('patients').where({ id }).update({ username, updated_at: now });
+        }
+      });
+      if (login) await revokeAllForUser(ctx, login.id); // an old card's password, or the patient's own, no longer signs anyone in
+
+      await audit(ctx, req, { userId: user.id, action: 'patient.card', entity: 'patient', entityId: id, diff: { created: !login, reset } });
+      res.status(200).set({
+        'Content-Type': 'application/pdf', 'Content-Disposition': `attachment; filename="patient-card-${patient.patient_identifier}.pdf"`,
+        'Cache-Control': 'private, no-store',
+      }).send(pdf);
+    },
+  );
 
   // Soft delete: the patient goes to the Trash (admin only), with their visits and payments. Only an admin
   // can restore or erase them for good. A doctor can delete only patients he can see.

@@ -58,7 +58,11 @@ export interface PatientDto {
   /** Internal notes. Never sent to patients. */
   description?: string | null;
   doctorId: number | null;
+  /** Made from the name when the patient is registered; never changes. Null only for a record from before usernames. */
+  username: string | null;
   hasAccount: boolean;
+  /** Staff view only: no login yet, a login whose first password has not been changed yet, or a login in use. */
+  loginState?: 'none' | 'waiting' | 'active';
   createdAt: string | null;
 }
 

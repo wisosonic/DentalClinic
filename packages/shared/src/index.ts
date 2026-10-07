@@ -33,11 +33,23 @@ export const passwordSchema = z.string().superRefine((value, ctx) => {
   if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
 });
 
+/** What a person types to sign in: their email, or the username of a patient login. */
+export const loginNameSchema = z.string().trim().toLowerCase().min(1).max(255);
+
 export const loginSchema = z.object({
-  email: emailSchema,
+  identifier: loginNameSchema,
   password: z.string().min(1).max(128),
   remember: z.boolean().optional().default(false),
 });
+
+/** What the server accepts: the same, with `email` still understood as the old name of `identifier`. */
+export const loginRequestSchema = z.preprocess((v) => {
+  if (v && typeof v === 'object' && !Array.isArray(v)) {
+    const o = v as Record<string, unknown>;
+    if (o.identifier === undefined && o.email !== undefined) return { ...o, identifier: o.email };
+  }
+  return v;
+}, loginSchema);
 export type LoginInput = z.infer<typeof loginSchema>;
 
 export const changePasswordSchema = z.object({
@@ -55,6 +67,8 @@ export interface PublicUser {
   id: number;
   name: string;
   email: string;
+  /** The patient login's username (also what a patient signs in with); null for everyone else. */
+  username: string | null;
   role: Role;
   mustChangePassword: boolean;
   isActive: boolean;

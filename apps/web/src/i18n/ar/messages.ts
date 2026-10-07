@@ -202,7 +202,11 @@ export const messages: Dictionary = {
   'Duplicate tooth': 'سن مكرر',
 
   // Accounts and passwords
-  'Invalid email or password': 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
+  "The patient’s login is switched off: an administrator can switch it on under Users": "حساب دخول المريض معطّل: يمكن للمدير تفعيله من صفحة المستخدمين",
+  "The patient has already chosen their own password": "اختار المريض كلمة مروره بنفسه",
+  "Someone else just made this patient a card: try again": "أنشأ شخص آخر بطاقة لهذا المريض للتو: حاول مرة أخرى",
+  "Too many cards. Please wait a minute.": "عدد كبير من البطاقات. انتظر دقيقة.",
+  'Invalid email, username or password': 'البريد الإلكتروني أو اسم المستخدم أو كلمة المرور غير صحيحة',
   'Current password is incorrect': 'كلمة المرور الحالية غير صحيحة',
   'New password must be different from the current one': 'يجب أن تختلف كلمة المرور الجديدة عن الحالية',
   'You must change your password first': 'يجب تغيير كلمة المرور أولاً',

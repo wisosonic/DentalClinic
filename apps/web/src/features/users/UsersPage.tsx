@@ -136,7 +136,7 @@ export function UsersPage() {
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const found = (data?.data ?? []).filter((u) => !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+    const found = (data?.data ?? []).filter((u) => !q || u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.username ?? '').includes(q));
     const value = (u: PublicUser) =>
       ({ name: u.name, email: u.email, role: u.role, status: u.isActive ? 1 : 0, lastLogin: u.lastLoginAt })[sort.key];
     return sortRows(found, value, sort.order);
@@ -200,7 +200,7 @@ export function UsersPage() {
                   {u.name}
                   {u.role === 'doctor' && !u.doctor && <Chip size="small" color="warning" label={t('Not linked to a doctor')} sx={{ marginInlineStart: 1 }} />}
                 </TableCell>
-                <TableCell><bdi dir="ltr">{u.email}</bdi></TableCell>
+                <TableCell><bdi dir="ltr">{u.email.endsWith('@patients.invalid') ? u.username : u.email}</bdi></TableCell>
                 <TableCell><Chip size="small" label={t(u.role)} sx={{ textTransform: 'capitalize' }} /></TableCell>
                 <TableCell>
                   <Chip size="small" color={u.isActive ? 'success' : 'default'} variant={u.isActive ? 'filled' : 'outlined'} label={u.isActive ? t('Active') : t('Switched off')} />

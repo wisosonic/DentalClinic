@@ -15,6 +15,7 @@ export interface UserRow {
   id: number;
   name: string;
   email: string;
+  username?: string | null;
   role: PublicUser['role'];
   change_password: number | boolean;
   is_active: number | boolean;
@@ -39,6 +40,7 @@ export function toPublicUser(row: Omit<UserRow, 'password'> & { password?: strin
     id: row.id,
     name: row.name,
     email: row.email,
+    username: row.username ?? null,
     role: row.role,
     mustChangePassword: Boolean(row.change_password),
     isActive: Boolean(row.is_active),

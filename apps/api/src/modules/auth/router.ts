@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import {
   changePasswordSchema,
-  loginSchema,
+  loginRequestSchema,
   passwordProblem,
   resetPasswordSchema,
 } from '@aya/shared';
@@ -24,16 +24,20 @@ import {
 } from './session';
 
 const MINUTE = 60 * 1000;
-const invalidCredentials = () => new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+const invalidCredentials = () => new HttpError(401, 'INVALID_CREDENTIALS', 'Invalid email, username or password');
 
 export function authRouter(ctx: AppContext): Router {
   const { db, env } = ctx;
   const router = Router();
 
   router.post('/login', limiter(env, { windowMs: MINUTE, limit: 10 }), async (req, res) => {
-    const body = loginSchema.parse(req.body);
+    const body = loginRequestSchema.parse(req.body);
 
-    const user = (await db('users').whereRaw('lower(email) = ?', [body.email]).first()) as UserRow | undefined;
+    // An email has an @; a username (a patient's) never does.
+    const user = (await db('users').modify((qb) => {
+      if (body.identifier.includes('@')) qb.whereRaw('lower(email) = ?', [body.identifier]);
+      else qb.where({ username: body.identifier });
+    }).first()) as UserRow | undefined;
     const usable = Boolean(user && user.is_active);
     const locked = Boolean(user?.locked_until && user.locked_until > sqlNow());
 
@@ -55,7 +59,7 @@ export function authRouter(ctx: AppContext): Router {
       await audit(ctx, req, {
         userId: user?.id ?? null,
         action: 'auth.login.failed',
-        diff: { email: body.email, reason: !user ? 'unknown' : !usable ? 'inactive' : locked ? 'locked' : 'password' },
+        diff: { identifier: body.identifier, reason: !user ? 'unknown' : !usable ? 'inactive' : locked ? 'locked' : 'password' },
       });
       // Same response for every failure, including a locked account.
       throw invalidCredentials();

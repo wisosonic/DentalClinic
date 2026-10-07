@@ -78,3 +78,25 @@ describe('what a new installation starts with', () => {
     expect(await conn('users').count({ n: '*' }).first()).toMatchObject({ n: 0 });
   });
 });
+
+describe('migration 003: usernames for the patients that exist', () => {
+  it('gives each one a unique username made from the name, and leaves the logins alone', async () => {
+    const conn = fresh();
+    await conn.migrate.up(migrationConfig); // 001
+    await conn.migrate.up(migrationConfig); // 002
+    const now = '2026-10-07 10:00:00';
+    const [doctor] = await conn('doctors').insert({ fname: 'Aya', lname: 'Ghali', kind: 'owner', created_at: now, updated_at: now });
+    const rows: [string, string, string][] = [['1', 'Hicham', 'Cheaib'], ['2', 'Hicham', 'Cheaib'], ['3', 'Élie', 'Abi Nader'], ['4', 'عبد', 'الله'], ['5', 'Zoë', '']];
+    for (const [number, fname, lname] of rows) {
+      await conn('patients').insert({ patient_identifier: `10000${number}`, fname, lname, phone: number, doctor_id: doctor, created_at: now, updated_at: now });
+    }
+    await conn.migrate.up(migrationConfig); // 003
+    const names = (await conn('patients').orderBy('id').pluck('username')) as string[];
+    expect(names).toEqual(['hicham.cheaib', 'hicham.cheaib2', 'elie.abinader', 'patient100004', 'zoe']);
+    expect(new Set(names).size).toBe(names.length);
+    expect(await conn('users').whereNotNull('username').count({ n: '*' }).first()).toMatchObject({ n: 0 }); // a login gets its username with the card
+    await expect(conn('patients').where({ id: 2 }).update({ username: 'hicham.cheaib' })).rejects.toThrow(); // unique
+    await conn.migrate.down(migrationConfig);
+    expect(Object.keys(await conn('patients').columnInfo())).not.toContain('username');
+  });
+});

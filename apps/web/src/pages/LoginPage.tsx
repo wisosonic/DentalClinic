@@ -32,7 +32,7 @@ export function LoginPage() {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: '', password: '', remember: false },
+    defaultValues: { identifier: '', password: '', remember: false },
   });
 
   // Already signed in (e.g. opened /login in a second tab).
@@ -59,14 +59,13 @@ export function LoginPage() {
           </Alert>
         )}
         <TextField
-          label={t('Email')}
-          type="email"
+          label={t('Email or username')}
           autoComplete="username"
           autoFocus
-          error={!!errors.email}
-          helperText={errors.email && t('Enter a valid email address')}
-          slotProps={{ htmlInput: { dir: 'ltr' } }}
-          {...register('email')}
+          error={!!errors.identifier}
+          helperText={errors.identifier && t('Enter your email or username')}
+          slotProps={{ htmlInput: { dir: 'ltr', autoCapitalize: 'none', spellCheck: false } }}
+          {...register('identifier')}
         />
         <TextField
           label={t('Password')}

@@ -12,6 +12,8 @@ export const auth: Dictionary = {
   'Keep me signed in on this device': 'أبقِني مسجلاً للدخول على هذا الجهاز',
   'Forgot your password?': 'نسيت كلمة المرور؟',
   'Enter a valid email address': 'أدخل بريداً إلكترونياً صالحاً',
+  'Email or username': 'البريد الإلكتروني أو اسم المستخدم',
+  'Enter your email or username': 'أدخل بريدك الإلكتروني أو اسم المستخدم',
   'Enter your password': 'أدخل كلمة المرور',
   'Enter your account email and we\'ll send you a reset link.': 'أدخل البريد الإلكتروني لحسابك وسنرسل لك رابط إعادة التعيين.',
   'Send reset link': 'إرسال رابط إعادة التعيين',

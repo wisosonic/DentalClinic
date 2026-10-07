@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, IconButton, Paper, Stack, Tooltip, Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import BadgeOutlinedIcon from '@mui/icons-material/BadgeOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditIcon from '@mui/icons-material/Edit';
 import HistoryIcon from '@mui/icons-material/History';
@@ -19,6 +20,7 @@ import { formatDate, fullName } from '../../lib/format';
 import { useAppointmentDialogs } from '../appointments/AppointmentDialogs';
 import { useDeletePatientMutation, useGetConfigQuery, useGetDoctorsQuery, useGetPatientQuery } from '../clinical/clinicalApi';
 import { PatientChart } from '../visits/PatientChart';
+import { PatientCardDialog } from './PatientCardDialog';
 import { PatientFormDialog } from './PatientFormDialog';
 
 function age(dob: string | null, today: string | undefined, years: (n: number) => string): string {
@@ -48,6 +50,7 @@ export function PatientDetailPage() {
   const [remove, removeState] = useDeletePatientMutation();
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [cardOpen, setCardOpen] = useState(false);
   const { dialogs, openCreate } = useAppointmentDialogs();
 
   if (isLoading) return <CircularProgress aria-label={t('Loading patient')} />;
@@ -77,6 +80,7 @@ export function PatientDetailPage() {
             <Button component={RouterLink} to={`/treatment-offers?patientId=${patient.id}`} startIcon={<AssignmentIcon />}>{t('Treatment offers')}</Button>
             {role !== 'staff' && <Button component={RouterLink} to={`/payments?patientId=${patient.id}`} startIcon={<PaymentsIcon />}>{t('Payments')}</Button>}
             <Button component={RouterLink} to={`/lab-orders?patientId=${patient.id}`} startIcon={<ScienceIcon />}>{t('Lab orders')}</Button>
+            {role !== 'patient' && <Button startIcon={<BadgeOutlinedIcon />} onClick={() => setCardOpen(true)}>{t('Patient card')}</Button>}
             <Button startIcon={<EditIcon />} onClick={() => setEditing(true)}>{t('Edit')}</Button>
             {isAdmin && (
               <Tooltip title={t('Who viewed this record')}>
@@ -99,7 +103,11 @@ export function PatientDetailPage() {
           <Info label={t('Address')}>{patient.address}</Info>
           <Info label={t('Primary doctor')}>{doctor ? fullName(doctor) : ''}</Info>
           <Info label={t('Last visit')}>{formatDate(patient.lastVisit)}</Info>
-          <Info label={t('Portal account')}>{patient.hasAccount ? <Chip size="small" color="success" label={t('Has login')} /> : t('None')}</Info>
+          <Info label={t('Username')}>{patient.username && <bdi dir="ltr">{patient.username}</bdi>}</Info>
+          <Info label={t('Portal account')}>
+            {patient.loginState === 'waiting' ? <Chip size="small" color="warning" label={t('First password not changed yet')} />
+              : patient.hasAccount ? <Chip size="small" color="success" label={t('Has login')} /> : t('None')}
+          </Info>
           {patient.description && (
             <Box sx={{ gridColumn: '1 / -1' }}>
               <Typography variant="caption" color="text.secondary" display="block">{t('Internal notes')}</Typography>
@@ -119,6 +127,7 @@ export function PatientDetailPage() {
       )}
 
 
+      <PatientCardDialog open={cardOpen} onClose={() => setCardOpen(false)} patient={patient} />
       <PatientFormDialog open={editing} onClose={() => setEditing(false)} patient={patient} />
       <ConfirmDialog
         open={deleting}
