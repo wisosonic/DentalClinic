@@ -10,12 +10,12 @@ const schema = z.object({
 
   // 'sqlite' for development; set to 'mysql' (MariaDB/MySQL) later without code changes.
   DB_CLIENT: z.enum(['sqlite', 'mysql']).default('sqlite'),
-  DB_FILENAME: z.string().default('./data/aya_clinic.sqlite'),
+  DB_FILENAME: z.string().default('./data/dental_clinic.sqlite'),
   DB_HOST: z.string().default('127.0.0.1'),
   DB_PORT: z.coerce.number().int().default(3306),
   DB_USER: z.string().default('root'),
   DB_PASSWORD: z.string().default(''),
-  DB_NAME: z.string().default('aya_clinic'),
+  DB_NAME: z.string().default('dental_clinic'),
 
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   ACCESS_TTL_MIN: z.coerce.number().int().positive().default(15),

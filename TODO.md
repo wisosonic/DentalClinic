@@ -27,7 +27,6 @@ The statuses are now draft, accepted and cancelled (migration 022 applies by its
 
 The merge is built (see CLAUDE.md and section 13.2 of the plan). Left:
 
-- [ ] Look at the Treatment offers list and detail pages in the browser, in both languages and in dark mode; check the old data (70 offers with one item each) reads sensibly
 - [ ] **Before the first real deployment, back up the database:** migration 020 (treatment offers) cannot be rolled back, and it applies by itself when the API starts. (The dev database was migrated on 2026-10-06: 70 offers, $7,850 and 78 payments, $5,485, all unchanged.)
 
 ---
@@ -71,6 +70,6 @@ The documents are built (see CLAUDE.md). Left:
 - [ ] Penetration-test checklist and load test
 - [ ] Backups and a tested restore, monitoring and error tracking
 - [ ] Production deployment: HTTPS, `NODE_ENV=production`, `TRUST_PROXY`, a real `JWT_SECRET`, reverse proxy
-- [ ] Rotate the admin password and keep `aya_clinic.sql` out of any public repository
+- [ ] Before go-live: run `npm run db:setup` on the new server (it prints the first administrator's temporary password once), sign in and change it; set `NODE_ENV=production`, HTTPS and `TRUST_PROXY`
 - [ ] Drop the unused `roles` / `role_user` tables
 - [ ] Docs: user guide (English and Arabic), backup and restore, deployment

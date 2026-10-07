@@ -17,10 +17,9 @@ Full-stack web app for a dental clinic: appointments, patient records and tooth 
 ## Layout
 
 ```
-apps/api        Express API, Knex migrations, import and admin scripts
+apps/api        Express API, Knex migration, setup and admin scripts
 apps/web        React SPA (Vite dev server proxies /api to the API)
 packages/shared Zod schemas and types used by both apps
-aya_clinic.sql  Original database dump (never edited; only read by the importer)
 ```
 
 ## Getting started
@@ -30,16 +29,16 @@ Requires Node 22 or newer. No database server is needed.
 ```bash
 npm install
 cp apps/api/.env.example apps/api/.env     # then set JWT_SECRET (see the file)
-npm run db:import                          # creates the SQLite DB and loads aya_clinic.sql
+npm run db:setup -- --admin-name "Dr Name" --admin-email you@clinic.example
 npm run dev                                # API http://localhost:4000, web http://localhost:5180
 ```
 
-`db:import` creates `apps/api/data/aya_clinic.sqlite`, loads your data, and prints a verification table: row counts and money totals compared with the dump. To start over, run `npm run db:import -- --reset` (development only).
+**This is a new installation, not an upgrade:** the project is deployed from zero on a new server and carries no data from the old app. `db:setup` creates the empty database (`apps/api/data/dental_clinic.sqlite`, one migration holds the whole schema), adds the 32 teeth, and creates the **first administrator**. It prints a random temporary password once; the administrator must change it at the first sign-in (pass `--admin-password` to choose one). It is safe to run again: nothing that exists is touched, and a second administrator is never created this way. Everything else (clinic, doctors, procedures, medications, patients) is entered in the app.
 
-**Signing in:** the admin account from your data is `dr.aya.ghali@gmail.com` with its existing password. If you don't know it, set a new temporary one:
+**Signing in:** use the administrator's email and the temporary password. To set a new temporary password for anyone later:
 
 ```bash
-npm run user:set-password -w apps/api -- dr.aya.ghali@gmail.com
+npm run user:set-password -w apps/api -- you@clinic.example
 ```
 
 It prints a random password, and you must change it at the next sign-in. The clinic sends **no email**: a forgotten password is fixed by an admin under *Users*, who makes a one-time **reset link** (valid 24 hours, lets the person choose their own password) or a temporary password and hands it over in person or by phone. *Users* also creates accounts, including logins for doctors (then link the login under *Doctors > Edit*), and switches accounts on or off.
@@ -58,10 +57,10 @@ DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=
-DB_NAME=aya_clinic
+DB_NAME=dental_clinic
 ```
 
-and run `npm run db:import` again. The same migrations and import run on both. Do this before go-live, and run the tests against MySQL once, because SQLite is more forgiving than MySQL about some things (for example column widths).
+and run `npm run db:setup` (it creates the schema in that database). The same migration runs on both. Do this before go-live, and run the tests against MySQL once, because SQLite is more forgiving than MySQL about some things (for example column widths).
 
 ## What you can do now
 
@@ -101,7 +100,7 @@ Doctors have no fixed working days or hours, so any day and time can be booked. 
 | `npm test` | All tests (API and web) |
 | `npm run typecheck` | TypeScript check of every package |
 | `npm run db:migrate` | Apply database migrations |
-| `npm run db:import [-- --reset]` | Import `aya_clinic.sql` and verify it |
+| `npm run db:setup -- --admin-name ... --admin-email ...` | New installation: schema, the 32 teeth, the first administrator (safe to repeat) |
 | `npm run user:set-password -w apps/api -- <email> [password]` | Set a user's password (forces a change at next login) |
 
 ## Phases
@@ -122,7 +121,6 @@ Doctors have no fixed working days or hours, so any day and time can be booked. 
 
 ## Security notes
 
-- [aya_clinic.sql](aya_clinic.sql) contains a real password hash and login token for the admin. Do not publish the file or commit it to a public repository. The importer does not carry the login token over.
 - Patient data is sensitive health data. Check which privacy rules apply (HIPAA, GDPR or local law) before going live.
 - Before launch: set `NODE_ENV=production` (secure cookies), put the API behind HTTPS, and set `TRUST_PROXY=true` if behind a reverse proxy.
 

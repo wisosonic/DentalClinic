@@ -12,7 +12,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "eslint .",
     "db:migrate": "npm run db:migrate -w apps/api",
-    "db:import": "npm run db:import -w apps/api"
+    "db:setup": "npm run db:setup -w apps/api"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

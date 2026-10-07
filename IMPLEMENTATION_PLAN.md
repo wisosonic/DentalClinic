@@ -1,6 +1,6 @@
 # Dental Clinic — Dental Management System: Implementation Plan
 
-Status: **phases 0–3 implemented** (see §13) · Source schema: [aya_clinic.sql](aya_clinic.sql) (MariaDB 10.4, Laravel-generated)
+Status: **phases 0–7 implemented** (see §13) · **Deployed from zero on a new server (owner decision 2026-10-07): nothing is imported or upgraded from the old app.** The sections below that talk about the dump, its import and the first 25 migrations are the history of how the schema was designed; the schema is now the single migration `001_initial_schema`, and a new installation runs `npm run db:setup`.
 
 ---
 
@@ -91,11 +91,10 @@ The database was designed in Laravel and exported from phpMyAdmin. Reading it tu
 
 ```
 DentalClinic/
-├─ aya_clinic.sql
 ├─ apps/
 │  ├─ api/
-│  │  ├─ scripts/ (migrate, import-dump, set-password)
-│  │  └─ src/ (db/ holds connection, migrations/, importDump.ts)
+│  │  ├─ scripts/ (migrate, setup, set-password)
+│  │  └─ src/ (db/ holds connection, migrations/, setup.ts)
 │  │     ├─ app.ts, server.ts, config/env.ts
 │  │     ├─ middleware/ (auth, rbac, validate, error, rateLimit, audit)
 │  │     ├─ modules/
