@@ -61,6 +61,20 @@ export const uploadsSettingsSchema = z.object({
 });
 export type UploadsSettings = z.output<typeof uploadsSettingsSchema>;
 
+/**
+ * Trash and activity log: how long things are kept. 0 means "never remove by itself" (the starting value, since
+ * erasing is permanent): the Trash is then emptied by an admin only, and the log kept until cleared by hand.
+ */
+export const TRASH_MIN_DAYS = 7;
+export const AUDIT_MIN_DAYS = 30;
+export const retentionSettingsSchema = z.object({
+  /** Days a deleted item stays in the Trash before it is erased for good, or 0 for never. */
+  trashDays: whole(0, 3650).refine((v) => v === 0 || v >= TRASH_MIN_DAYS, `Use 0 for never, or at least ${TRASH_MIN_DAYS} days`),
+  /** Days an activity-log entry is kept before it is removed, or 0 for never. */
+  auditDays: whole(0, 3650).refine((v) => v === 0 || v >= AUDIT_MIN_DAYS, `Use 0 for never, or at least ${AUDIT_MIN_DAYS} days`),
+});
+export type RetentionSettings = z.output<typeof retentionSettingsSchema>;
+
 /** How dates and times are shown. */
 export const WEEK_STARTS = ['monday', 'sunday', 'saturday'] as const;
 export type WeekStart = (typeof WEEK_STARTS)[number];
@@ -80,6 +94,7 @@ export const OPERATING_SCHEMAS = {
   waiting: waitingSettingsSchema,
   uploads: uploadsSettingsSchema,
   display: displaySettingsSchema,
+  retention: retentionSettingsSchema,
 } as const;
 export type OperatingGroup = keyof typeof OPERATING_SCHEMAS;
 export const OPERATING_GROUPS = Object.keys(OPERATING_SCHEMAS) as OperatingGroup[];
@@ -91,4 +106,5 @@ export interface OperatingSettings {
   waiting: WaitingSettings;
   uploads: UploadsSettings;
   display: DisplaySettings;
+  retention: RetentionSettings;
 }

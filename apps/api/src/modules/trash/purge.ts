@@ -3,6 +3,10 @@ import type { Db } from '../../db/connection';
 export type TrashKind = 'patient' | 'appointment' | 'report' | 'offer' | 'payment' | 'commission' | 'expense' | 'lab_order' | 'document';
 export const TRASH_KINDS: TrashKind[] = ['patient', 'appointment', 'report', 'offer', 'payment', 'commission', 'expense', 'lab_order', 'document'];
 
+export const TRASH_TABLES: Record<TrashKind, string> = {
+  patient: 'patients', appointment: 'appointments', report: 'reports', offer: 'treatment_offers', payment: 'payments', commission: 'payments', expense: 'expenses', lab_order: 'lab_orders', document: 'patient_documents',
+};
+
 type Conn = Db | Parameters<Parameters<Db['transaction']>[0]>[0];
 
 /** Everything that goes when one record is erased for good. Ids only. */

@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import { OPERATING_SCHEMAS, WEEK_STARTS, TIME_FORMATS, type OperatingGroup, type OperatingSettings } from '@aya/shared';
 import { errorMessage } from '../../lib/baseQuery';
 import { validate, type FieldErrors } from '../../lib/zodForm';
-import { EmptySection } from './SettingsLayout';
 import { useOperatingSettingsQuery, useSaveOperatingSettingsMutation } from './operatingApi';
 
 type Field =
@@ -154,8 +153,15 @@ export function DisplaySection() {
   );
 }
 
-/** Nothing to set yet: the page exists so the settings have a place for it. */
 export function TrashAuditSection() {
   const { t } = useTranslation();
-  return <EmptySection title={t('Trash and activity log')} />;
+  return (
+    <OperatingForm
+      group="retention" title={t('Trash and activity log')} intro={t('How long deleted items and activity-log entries are kept. Each starts at 0, which means never removed by itself.')}
+      fields={[
+        { key: 'trashDays', kind: 'number', label: t('Erase items from the Trash after'), unit: t('days'), help: t('0 keeps them until an admin erases them. Otherwise at least 7 days. Erasing is permanent and removes what is attached (a patient’s visits, offers, payments and documents), the same as erasing it by hand.') },
+        { key: 'auditDays', kind: 'number', label: t('Remove activity-log entries after'), unit: t('days'), help: t('0 keeps them until the log is cleared by hand. Otherwise at least 30 days. Run once a night; one entry records how many were removed.') },
+      ]}
+    />
+  );
 }

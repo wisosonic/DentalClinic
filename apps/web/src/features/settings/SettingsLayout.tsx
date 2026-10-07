@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Box, List, ListItemButton, ListItemIcon, ListItemText, Paper, Typography } from '@mui/material';
+import { Box, List, ListItemButton, ListItemIcon, ListItemText, Paper } from '@mui/material';
 import CalculateIcon from '@mui/icons-material/Calculate';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
@@ -27,17 +27,6 @@ export const SETTINGS_SECTIONS: { to: string; label: string; icon: ReactNode }[]
   { to: '/settings/trash-and-log', label: 'Trash and activity log', icon: <DeleteSweepIcon /> },
   { to: '/settings/taxes', label: 'Taxes', icon: <CalculateIcon /> },
 ];
-
-/** The page of a section nobody has put anything in yet. */
-export function EmptySection({ title }: { title: string }) {
-  const { t } = useTranslation();
-  return (
-    <Paper component="section" aria-label={title} sx={{ p: 3, maxWidth: 860 }}>
-      <Typography variant="h6" component="h2">{title}</Typography>
-      <Typography color="text.secondary" sx={{ mt: 0.5 }}>{t('There is nothing to set here yet. Settings added later will appear on this page.')}</Typography>
-    </Paper>
-  );
-}
 
 /**
  * Settings: a vertical list of sections on the side (a row you can scroll on a phone) and the chosen

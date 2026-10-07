@@ -14,6 +14,7 @@ const DEFAULTS = {
   waiting: { chime: true, unitLetters: false, finishedCallSeconds: 0 },
   uploads: { maxDocumentMb: 25, maxDocumentsPerPatient: 200 },
   display: { weekStart: 'monday', timeFormat: '24h' },
+  retention: { trashDays: 0, auditDays: 0 },
 } as const;
 const CONFIG = {
   defaultDuration: 30, durationStep: 15, minDuration: 15, maxDuration: 480, cancelMinHours: 24, timezone: 'Asia/Beirut', today: '2026-10-07',
@@ -137,11 +138,20 @@ describe('the settings pages for how the clinic runs', () => {
     expect(calls('PUT', '/settings/waiting')[0]!.body).toEqual({ chime: true, unitLetters: true, finishedCallSeconds: 20 });
   });
 
-  it('trash and activity log: the page is there, with nothing to set yet', async () => {
+  it('trash and activity log: how long deleted items and log entries are kept, 0 meaning never', async () => {
     admin();
     renderApp(<App />, '/settings/trash-and-log');
     const region = await screen.findByRole('region', { name: 'Trash and activity log' });
-    expect(within(region).getByText(/nothing to set here yet/)).toBeInTheDocument();
+    expect(await within(region).findByLabelText('Erase items from the Trash after')).toHaveValue(0);
+    fireEvent.change(within(region).getByLabelText('Erase items from the Trash after'), { target: { value: '90' } });
+    fireEvent.change(within(region).getByLabelText('Remove activity-log entries after'), { target: { value: '365' } });
+    await userEvent.click(within(region).getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(calls('PUT', '/settings/retention')).toHaveLength(1));
+    expect(calls('PUT', '/settings/retention')[0]!.body).toEqual({ trashDays: 90, auditDays: 365 });
+    fireEvent.change(within(region).getByLabelText('Erase items from the Trash after'), { target: { value: '3' } });
+    await userEvent.click(within(region).getByRole('button', { name: 'Save' }));
+    expect(await within(region).findByText(/at least 7 days/i)).toBeInTheDocument();
+    expect(calls('PUT', '/settings/retention')).toHaveLength(1);
     const nav = within(screen.getByRole('navigation', { name: 'Settings sections' }));
     expect(nav.getByRole('link', { name: 'Trash and activity log' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('Trash and activity log');

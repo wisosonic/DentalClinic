@@ -26,6 +26,7 @@ const DEFAULTS = {
   waiting: { chime: true, unitLetters: false, finishedCallSeconds: 0 },
   uploads: { maxDocumentMb: 25, maxDocumentsPerPatient: 200 },
   display: { weekStart: 'monday', timeFormat: '24h' },
+  retention: { trashDays: 0, auditDays: 0 },
 };
 
 beforeAll(async () => {
@@ -44,7 +45,7 @@ beforeEach(async () => {
   if (uploads) await rm(uploads, { recursive: true, force: true });
   uploads = await mkdtemp(path.join(tmpdir(), 'aya-operating-'));
   t.env.UPLOAD_DIR = uploads;
-  await t.db('app_settings').whereIn('key', (await t.db('app_settings').pluck('key')).filter((k: string) => /^(appointments|security|portal|waiting|uploads|display)\./.test(k))).del();
+  await t.db('app_settings').whereIn('key', (await t.db('app_settings').pluck('key')).filter((k: string) => /^(appointments|security|portal|waiting|uploads|display|retention)\./.test(k))).del();
   for (const table of ['waiting_tickets', 'patient_documents', 'payments', 'offer_items', 'treatment_offers', 'notifications', 'appointment_category', 'appointments', 'refresh_tokens', 'audit_log']) await t.db(table).del();
   await t.db('users').update({ failed_logins: 0, locked_until: null });
 });
@@ -54,7 +55,7 @@ const ctx = () => ({ db: t.db, env: t.env, logger: pino({ level: 'silent' }), cl
 const appointment = async (patientId: number, extra: Record<string, unknown> = {}) =>
   (await t.db('appointments').insert({ date: TOMORROW, time: '10:00', status: 'confirmed', patient_id: patientId, doctor_id: s.doctorId, clinic_id: s.clinicId, unit_id: s.unitId, duration_minutes: 30, ...stamp, ...extra }))[0]!;
 
-describe('the six settings pages', () => {
+describe('the seven settings pages', () => {
   it.each(Object.keys(DEFAULTS))('%s: starts from the old fixed values, can be changed, and is remembered', async (group) => {
     const first = await admin.get(`/settings/${group}`);
     expect(first.status).toBe(200);
@@ -89,6 +90,8 @@ describe('the six settings pages', () => {
       ['display', { weekStart: 'friday', timeFormat: '24h' }, 'weekStart'],
       ['display', { weekStart: 'monday', timeFormat: 'metric' }, 'timeFormat'],
       ['waiting', { ...DEFAULTS.waiting, finishedCallSeconds: 9999 }, 'finishedCallSeconds'],
+      ['retention', { ...DEFAULTS.retention, trashDays: 3 }, 'trashDays'],
+      ['retention', { ...DEFAULTS.retention, auditDays: 10 }, 'auditDays'],
       ['portal', { enabled: 'yes', showPayments: true, documentsVisibleByDefault: false }, 'enabled'],
     ];
     for (const [group, body, field] of cases) {

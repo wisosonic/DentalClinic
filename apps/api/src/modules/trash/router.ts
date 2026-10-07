@@ -8,8 +8,8 @@ import { requireAuth, requirePermission, requireRole, requireUser } from '../../
 import { assertBookable } from '../appointments/service';
 import { recalcOffer } from '../offers/service';
 import { audit } from '../audit/audit';
-import { removeDocumentFiles } from '../documents/router';
-import { countsOf, erase, footprint, type TrashKind } from './purge';
+import { countsOf, footprint, TRASH_TABLES, type TrashKind } from './purge';
+import { purgeItem } from './retention';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any -- DB row
 
@@ -25,7 +25,7 @@ const listQuery = z.object({
   order: z.enum(['asc', 'desc']).default('desc'),
 });
 
-const TABLES = { patient: 'patients', appointment: 'appointments', report: 'reports', offer: 'treatment_offers', payment: 'payments', commission: 'payments', expense: 'expenses', lab_order: 'lab_orders', document: 'patient_documents' } as const;
+const TABLES = TRASH_TABLES;
 
 const purgeBody = z.object({ confirm: z.string().trim().max(200) });
 
@@ -203,17 +203,7 @@ export function trashRouter(ctx: AppContext): Router {
     const expected = `${patientRow.fname} ${patientRow.lname}`.trim();
     if (confirm.toLowerCase() !== expected.toLowerCase()) throw badRequest('CONFIRM_MISMATCH', 'The name you typed does not match');
 
-    let files: string[] = [];
-    const counts = await db.transaction(async (trx) => {
-      const f = await footprint(trx, kind, id);
-      const c = await countsOf(trx, f);
-      if (f.documents.length) files = (await trx('patient_documents').whereIn('id', f.documents).select('file_name')).map((r: Row) => r.file_name as string);
-      const offerOfPayment = kind === 'payment' ? (await trx('payments').where({ id }).first('offer_id'))?.offer_id : null;
-      await erase(trx, f);
-      if (offerOfPayment) await recalcOffer(trx, offerOfPayment);
-      return c;
-    });
-    await removeDocumentFiles(ctx.env, files); // only once the database change is safe
+    const counts = await purgeItem(ctx, kind, id);
     // Who, what and how much: never the content, and the entry stays after the data is gone.
     await audit(ctx, req, { userId: user.id, action: 'trash.purge', entity: kind, entityId: id, diff: { counts } });
     res.status(204).end();

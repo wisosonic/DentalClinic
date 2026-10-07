@@ -2,7 +2,8 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { AuditEntryDto } from '@aya/shared';
 import type { AppContext } from '../../context';
-import { notFound } from '../../lib/errors';
+import { sqlNow } from '../../db/connection';
+import { HttpError, notFound } from '../../lib/errors';
 import { requireAuth, requirePermission, requireUser } from '../../middleware/auth';
 import { audit } from './audit';
 
@@ -25,15 +26,25 @@ const query = z.object({
   order: z.enum(['asc', 'desc']).default('desc'),
 });
 
+const EXPORT_MAX = 100_000;
+
+/** One CSV cell. A leading = + - @ would make a spreadsheet run it as a formula, so it gets a quote in front. */
+function csvCell(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  let s = String(value);
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
 const DOCUMENTS = ['report.pdf', 'quote.pdf', 'offer.pdf', 'payment.receipt'];
 
 export function auditRouter(ctx: AppContext): Router {
   const router = Router();
   router.use(requireAuth(ctx), requirePermission('audit:read'));
 
-  router.get('/', async (req, res) => {
-    const q = query.parse(req.query);
-    const base = ctx.db('audit_log as l')
+  /** The entries a filter selects, with the person's name. */
+  const filtered = (q: z.output<typeof query>) =>
+    ctx.db('audit_log as l')
       .leftJoin('users as u', 'u.id', 'l.user_id')
       .modify((qb) => {
         if (q.action) qb.where('l.action', q.action);
@@ -46,6 +57,27 @@ export function auditRouter(ctx: AppContext): Router {
         if (q.from) qb.where('l.created_at', '>=', `${q.from} 00:00:00`);
         if (q.to) qb.where('l.created_at', '<=', `${q.to} 23:59:59`);
       });
+
+  // The log as a spreadsheet file: the same filters as the list, every matching entry, oldest first. Ids and names only, like the list.
+  router.get('/export.csv', async (req, res) => {
+    const user = requireUser(req);
+    const q = query.parse(req.query);
+    const base = filtered(q);
+    const total = Number((await base.clone().count({ n: '*' }).first())?.n ?? 0);
+    if (total > EXPORT_MAX) throw new HttpError(413, 'TOO_MANY_ROWS', `There are ${total} entries; narrow the dates (the limit is ${EXPORT_MAX})`);
+    const rows: Row[] = await base.clone().select('l.*', 'u.name as user_name').orderBy([{ column: 'l.created_at', order: 'asc' }, { column: 'l.id', order: 'asc' }]);
+    const lines = [['When (UTC)', 'Person', 'Action', 'Record type', 'Record id', 'Details', 'IP address'].map(csvCell).join(',')];
+    for (const r of rows) lines.push([r.created_at, r.user_name, r.action, r.entity, r.entity_id, r.diff, r.ip].map(csvCell).join(','));
+    await audit(ctx, req, { userId: user.id, action: 'audit.export', diff: { rows: rows.length, from: q.from ?? null, to: q.to ?? null } });
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="activity-log-${sqlNow().slice(0, 10)}.csv"`);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(`\uFEFF${lines.join('\r\n')}\r\n`);
+  });
+
+  router.get('/', async (req, res) => {
+    const q = query.parse(req.query);
+    const base = filtered(q);
     const total = Number((await base.clone().count({ n: '*' }).first())?.n ?? 0);
 
     const column = { time: 'l.created_at', user: 'u.name', action: 'l.action' }[q.sort];

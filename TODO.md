@@ -25,8 +25,6 @@ The documents, their previews and the "visible to the patient" mark are built, a
 ## Phase 9: Secondary modules
 
 - [ ] Events and promotions CRUD and UI, and promotion codes and discounts on quotes (`POST /promotions/validate`; the owner chose to keep quotes to a plain price until then)
-- [ ] Trash and activity log settings: the page exists with nothing on it; add the retention options when the owner decides (how long deleted items stay in the Trash, how long activity-log entries are kept)
-- [ ] Audit log extras (the Activity log page exists): export to CSV, and a retention rule (how long entries are kept)
 
 ## Phase 10: Hardening and launch
 

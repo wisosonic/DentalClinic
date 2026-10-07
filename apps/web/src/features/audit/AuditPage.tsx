@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
+import DownloadIcon from '@mui/icons-material/Download';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { PageHeader } from '../../components/PageHeader';
 import { SortCell, useSort } from '../../components/SortHead';
@@ -142,6 +143,10 @@ export const ACTION_LABEL: Record<string, string> = {
   'auth.password.change': 'Changed own password',
   'auth.password.reset.complete': 'Chose a new password from a reset link',
   'audit.clear': 'Cleared the activity log',
+  'audit.export': 'Downloaded the activity log',
+  'audit.retention': 'Removed old activity log entries automatically',
+  'trash.autopurge': 'Erased old items from the Trash automatically',
+  'settings.retention.update': 'Changed the Trash and activity log settings',
   'audit.delete': 'Deleted one activity log entry',
   'auth.refresh.reuse': 'Reused an old session (sessions ended)',
 };
@@ -175,6 +180,9 @@ export function AuditPage() {
 
   const when = (utc: string) =>
     new Intl.DateTimeFormat(dateLocale(), { dateStyle: 'medium', timeStyle: 'short', timeZone: config?.timezone }).format(new Date(`${utc.replace(' ', 'T')}Z`));
+  // The file holds every entry the filters select (not only this page), a plain link so the browser downloads it.
+  const exportParams = new URLSearchParams(Object.entries({ kind, userId, entity, entityId, from, to }).filter((e): e is [string, string] => Boolean(e[1])));
+  const exportUrl = `/api/v1/audit-log/export.csv${exportParams.size ? `?${exportParams}` : ''}`;
   const rows = data?.data ?? [];
   const patientName = rows.find((r) => r.entity === 'patient' && r.entityId === entityId)?.entityLabel;
 
@@ -183,7 +191,12 @@ export function AuditPage() {
       <PageHeader
         title={t('Activity log')}
         subtitle={t('Who opened or changed what, and when. Only ids are recorded, never the content of a record.')}
-        actions={<Button color="error" variant="outlined" startIcon={<DeleteSweepIcon />} onClick={() => { clearState.reset(); setClearing(true); }}>{t('Clear the log')}</Button>}
+        actions={(
+          <>
+            <Button component="a" href={exportUrl} download variant="outlined" startIcon={<DownloadIcon />}>{t('Download as CSV')}</Button>
+            <Button color="error" variant="outlined" startIcon={<DeleteSweepIcon />} onClick={() => { clearState.reset(); setClearing(true); }}>{t('Clear the log')}</Button>
+          </>
+        )}
       />
 
       <Stack direction={{ xs: 'column', md: 'row' }} gap={1.5} sx={{ mb: 2 }} flexWrap="wrap">

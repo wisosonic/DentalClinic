@@ -10,8 +10,8 @@ import { audit } from '../audit/audit';
 import { readAll, save } from './app';
 
 /**
- * The operating settings (owner decision 2026-10-07): numbers and switches an admin changes under Settings, in six
- * groups (appointments, security, portal, waiting, uploads, display). Each value is one row of `app_settings` named
+ * The operating settings (owner decision 2026-10-07): numbers and switches an admin changes under Settings, in seven
+ * groups (appointments, security, portal, waiting, uploads, display, retention). Each value is one row of `app_settings` named
  * `<group>.<field>`; with no row, the starting value below applies. Where the server's environment used to hold the
  * value (cancel notice, lockout, how long "keep me signed in" lasts) the environment is now only that starting value.
  */
@@ -23,6 +23,7 @@ export function operatingDefaults(env: Env): OperatingSettings {
     waiting: { chime: true, unitLetters: false, finishedCallSeconds: 0 },
     uploads: { maxDocumentMb: 25, maxDocumentsPerPatient: 200 },
     display: { weekStart: 'monday', timeFormat: '24h' },
+    retention: { trashDays: 0, auditDays: 0 },
   };
 }
 
@@ -60,7 +61,7 @@ export async function assertPortalOn(ctx: AppContext): Promise<OperatingSettings
   return settings;
 }
 
-/** `GET` and `PUT /settings/<group>` for the six groups, admin only. */
+/** `GET` and `PUT /settings/<group>` for the seven groups, admin only. */
 export function operatingSettingsRouter(ctx: AppContext): Router {
   const router = Router();
   router.use(requireAuth(ctx), requireRole('admin'));
