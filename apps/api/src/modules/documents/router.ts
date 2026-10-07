@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import express, { Router } from 'express';
 import { z } from 'zod';
@@ -11,6 +11,7 @@ import type { AppContext } from '../../context';
 import { sqlNow } from '../../db/connection';
 import { HttpError, badRequest, forbidden, notFound } from '../../lib/errors';
 import { sniffDocument } from '../../lib/files';
+import { makeThumbnail } from '../../lib/thumbnail';
 import { doctorScope, ownsPatient } from '../../lib/scope';
 import { clinicNow } from '../../lib/time';
 import { whereWords } from '../../lib/search';
@@ -29,6 +30,9 @@ const listQuery = z.object({
 /** What the server names a stored file; checked before any path is built from it. */
 const STORED_NAME = /^doc-[a-f0-9]{12}\.(png|jpg|webp|pdf)$/;
 
+/** The preview of a picture is stored beside it, named from it. */
+const thumbName = (stored: string) => stored.replace(/\.[a-z]+$/, '.thumb.webp');
+
 /** The name a person is offered when saving: what it is and when, never the original file name (it may name the patient). */
 const downloadName = (r: Row, ext: string) => `${r.category}-${String(r.taken_on ?? r.created_at ?? '').slice(0, 10) || 'document'}.${ext}`;
 
@@ -38,7 +42,11 @@ export function documentDir(env: { UPLOAD_DIR: string }): string {
 
 /** Deletes stored files, ignoring any that are already gone. Run it after the database change has been committed. */
 export async function removeDocumentFiles(env: { UPLOAD_DIR: string }, names: (string | null | undefined)[]): Promise<void> {
-  for (const name of names) if (name && STORED_NAME.test(name)) await unlink(path.join(documentDir(env), name)).catch(() => undefined);
+  for (const name of names) {
+    if (!name || !STORED_NAME.test(name)) continue;
+    await unlink(path.join(documentDir(env), name)).catch(() => undefined);
+    await unlink(path.join(documentDir(env), thumbName(name))).catch(() => undefined); // none for a PDF: ignored
+  }
 }
 
 /**
@@ -69,7 +77,7 @@ export function documentRouters(ctx: AppContext): { forPatient: Router; byId: Ro
 
   const toDto = (r: Row, user: AuthUser): PatientDocumentDto => ({
     id: r.id, patientId: r.patient_id, category: r.category, title: r.title, takenOn: r.taken_on ?? null, note: r.note ?? null,
-    fileName: r.original_name, mime: r.mime, sizeBytes: r.size_bytes, isImage: String(r.mime).startsWith('image/'),
+    fileName: r.original_name, mime: r.mime, sizeBytes: r.size_bytes, isImage: String(r.mime).startsWith('image/'), patientVisible: !!r.patient_visible,
     appointment: r.appointment_id && r.a_date ? { id: r.appointment_id, date: r.a_date, time: r.a_time } : null,
     uploadedBy: r.uploaded_by ? { id: r.uploaded_by, name: r.u_name ?? '' } : null,
     createdAt: r.created_at ?? null,
@@ -132,12 +140,16 @@ export function documentRouters(ctx: AppContext): { forPatient: Router; byId: Ro
       const name = `doc-${randomBytes(6).toString('hex')}.${kind.ext}`;
       await mkdir(documentDir(env), { recursive: true });
       await writeFile(path.join(documentDir(env), name), body);
+      if (kind.image) {
+        const thumb = await makeThumbnail(body); // best effort: made again on first request if this fails
+        if (thumb) await writeFile(path.join(documentDir(env), thumbName(name)), thumb);
+      }
       const now = sqlNow();
       let id: number;
       try {
         [id] = await db('patient_documents').insert({
           patient_id: patientId, appointment_id: input.appointmentId ?? null, category: input.category, title: input.title, taken_on: input.takenOn ?? clinicNow(env, ctx.clock()).date,
-          note: input.note ?? null, file_name: name, original_name: (input.name || `${input.category}.${kind.ext}`).slice(0, 255), mime: kind.mime, size_bytes: body.length,
+          note: input.note ?? null, patient_visible: input.patientVisible === '1', file_name: name, original_name: (input.name || `${input.category}.${kind.ext}`).slice(0, 255), mime: kind.mime, size_bytes: body.length,
           sha256, uploaded_by: user.id, created_at: now, updated_at: now,
         });
       } catch (err) {
@@ -170,6 +182,27 @@ export function documentRouters(ctx: AppContext): { forPatient: Router; byId: Ro
     });
   });
 
+  // A small preview of a picture for the list. Made on first request when it is missing (older uploads); a PDF has none.
+  byId.get('/:id/thumbnail', requirePermission('documents:read'), async (req, res) => {
+    const user = requireUser(req);
+    const row = await load(user, idParam.parse(req.params.id));
+    if (!STORED_NAME.test(row.file_name) || !String(row.mime).startsWith('image/')) throw notFound('Document not found');
+    const thumb = thumbName(row.file_name);
+    const full = path.join(documentDir(env), thumb);
+    const exists = await access(full).then(() => true, () => false);
+    if (!exists) {
+      const made = await makeThumbnail(await readFile(path.join(documentDir(env), row.file_name)).catch(() => Buffer.alloc(0)));
+      if (!made) throw notFound('Document not found');
+      await writeFile(full, made);
+    }
+    res.sendFile(thumb, {
+      root: documentDir(env), dotfiles: 'deny',
+      headers: { 'Content-Type': 'image/webp', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox" },
+    }, (err) => {
+      if (err && !res.headersSent) res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Document not found' } });
+    });
+  });
+
   byId.patch('/:id', requirePermission('documents:update'), async (req, res) => {
     const user = requireUser(req);
     const id = idParam.parse(req.params.id);
@@ -185,6 +218,7 @@ export function documentRouters(ctx: AppContext): { forPatient: Router; byId: Ro
       ...(input.takenOn !== undefined && { taken_on: input.takenOn }),
       ...(input.appointmentId !== undefined && { appointment_id: input.appointmentId }),
       ...(input.note !== undefined && { note: input.note }),
+      ...(input.patientVisible !== undefined && { patient_visible: input.patientVisible }),
       updated_at: sqlNow(),
     });
     await audit(ctx, req, { userId: user.id, action: 'document.update', entity: 'document', entityId: id, diff: { fields: Object.keys(input) } });

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import {
-  Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, MenuItem, Paper, Stack, TextField, Tooltip, Typography,
+  Alert, Box, Button, Checkbox, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, IconButton, MenuItem, Paper, Stack, TextField, Tooltip, Typography,
 } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -18,6 +18,7 @@ interface Draft {
   title: string;
   takenOn: string;
   note: string;
+  patientVisible: boolean;
   state: 'ready' | 'sending' | 'done' | 'failed';
   problem?: string;
   duplicate?: boolean;
@@ -49,7 +50,7 @@ export function UploadDocumentsDialog({ open, onClose, patientId, today }: { ope
     for (const file of Array.from(files)) {
       if (!(DOCUMENT_MIME_TYPES as readonly string[]).includes(file.type)) bad.push(t('{{name}}: only PNG, JPEG, WebP and PDF files can be added', { name: file.name }));
       else if (file.size > DOCUMENT_MAX_BYTES) bad.push(t('{{name}}: the file must be smaller than 25 MB', { name: file.name }));
-      else good.push({ key: nextKey++, file, category: file.type === 'application/pdf' ? 'other' : 'xray', title: stem(file.name), takenOn: today, note: '', state: 'ready' });
+      else good.push({ key: nextKey++, file, category: file.type === 'application/pdf' ? 'other' : 'xray', title: stem(file.name), takenOn: today, note: '', patientVisible: false, state: 'ready' });
     }
     setRejected(bad);
     setDrafts((l) => [...l, ...good]);
@@ -58,7 +59,7 @@ export function UploadDocumentsDialog({ open, onClose, patientId, today }: { ope
 
   const send = async (d: Draft, allowDuplicate = false) => {
     patch(d.key, { state: 'sending', problem: undefined, duplicate: false });
-    const result = await upload({ patientId, file: d.file, category: d.category, title: d.title.trim(), takenOn: d.takenOn || undefined, note: d.note.trim() || undefined, allowDuplicate });
+    const result = await upload({ patientId, file: d.file, category: d.category, title: d.title.trim(), takenOn: d.takenOn || undefined, note: d.note.trim() || undefined, patientVisible: d.patientVisible, allowDuplicate });
     if ('error' in result && result.error) {
       const code = (result.error as { data?: { error?: { code?: string } } }).data?.error?.code;
       patch(d.key, { state: 'failed', problem: errorMessage(result.error), duplicate: code === 'DUPLICATE_DOCUMENT' });
@@ -121,6 +122,11 @@ export function UploadDocumentsDialog({ open, onClose, patientId, today }: { ope
               <TextField
                 label={t('Note (optional)')} value={d.note} margin="dense" size="small" disabled={d.state === 'sending' || d.state === 'done'}
                 onChange={(e) => patch(d.key, { note: e.target.value })} slotProps={{ htmlInput: { maxLength: 500, 'aria-label': t('Note of file {{n}}', { n: i + 1 }) } }}
+              />
+              <FormControlLabel
+                sx={{ display: 'flex' }} disabled={d.state === 'sending' || d.state === 'done'}
+                control={<Checkbox size="small" checked={d.patientVisible} onChange={(e) => patch(d.key, { patientVisible: e.target.checked })} slotProps={{ input: { 'aria-label': t('Visible to the patient, file {{n}}', { n: i + 1 }) } }} />}
+                label={<Typography variant="body2">{t('Visible to the patient')}</Typography>}
               />
               {d.state === 'failed' && (
                 <Alert severity="error" role="alert" sx={{ mt: 0.5 }} action={d.duplicate ? <Button color="inherit" size="small" onClick={() => send(d, true)}>{t('Add it anyway')}</Button> : undefined}>

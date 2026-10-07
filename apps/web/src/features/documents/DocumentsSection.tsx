@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Alert, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, Link, MenuItem, Paper, Skeleton, Table, TableBody, TableCell,
+  Alert, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, IconButton, InputAdornment, Link, MenuItem, Paper, Skeleton, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, TextField, Tooltip, Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
@@ -10,6 +10,7 @@ import ImageIcon from '@mui/icons-material/Image';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import SearchIcon from '@mui/icons-material/Search';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useTranslation } from 'react-i18next';
 import { DOCUMENT_CATEGORIES, documentUpdateSchema, type PatientDocumentDto } from '@aya/shared';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -25,6 +26,21 @@ import { UploadDocumentsDialog } from './UploadDocumentsDialog';
 type SortKey = 'title' | 'kind' | 'taken' | 'by' | 'size' | 'visit';
 
 const fileUrl = (d: PatientDocumentDto) => `/api/v1/documents/${d.id}/file`;
+const thumbUrl = (d: PatientDocumentDto) => `/api/v1/documents/${d.id}/thumbnail`;
+
+/** A small picture of a picture (or an icon for a PDF, or when no preview could be made). */
+function Preview({ doc, onOpen }: { doc: PatientDocumentDto; onOpen: () => void }) {
+  const { t } = useTranslation();
+  const [broken, setBroken] = useState(false);
+  const box = { width: 48, height: 48, flexShrink: 0, borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'action.hover', overflow: 'hidden' } as const;
+  if (!doc.isImage) return <Box sx={box} aria-hidden><PictureAsPdfIcon color="action" /></Box>;
+  if (broken) return <Box sx={box} aria-hidden><ImageIcon color="action" /></Box>;
+  return (
+    <Box component="button" type="button" onClick={onOpen} aria-label={t('Open {{title}}', { title: doc.title })} sx={{ ...box, p: 0, border: 0, cursor: 'pointer' }}>
+      <Box component="img" src={thumbUrl(doc)} alt="" loading="lazy" onError={() => setBroken(true)} sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+    </Box>
+  );
+}
 
 function EditDocumentDialog({ doc, onClose }: { doc: PatientDocumentDto; onClose: () => void }) {
   const { t } = useTranslation();
@@ -33,10 +49,11 @@ function EditDocumentDialog({ doc, onClose }: { doc: PatientDocumentDto; onClose
   const [category, setCategory] = useState<string>(doc.category);
   const [takenOn, setTakenOn] = useState(doc.takenOn ?? '');
   const [note, setNote] = useState(doc.note ?? '');
+  const [patientVisible, setPatientVisible] = useState(doc.patientVisible);
   const [errors, setErrors] = useState<FieldErrors>({});
 
   const submit = async () => {
-    const { data, errors: found } = validate(documentUpdateSchema, { title, category, takenOn, note });
+    const { data, errors: found } = validate(documentUpdateSchema, { title, category, takenOn, note, patientVisible });
     if (!data) return setErrors(found!);
     const result = await update({ id: doc.id, body: data });
     if (!('error' in result && result.error)) onClose();
@@ -54,6 +71,11 @@ function EditDocumentDialog({ doc, onClose }: { doc: PatientDocumentDto; onClose
         </TextField>
         <TextField label={t('Taken on')} type="date" value={takenOn} onChange={(e) => setTakenOn(e.target.value)} slotProps={{ inputLabel: { shrink: true } }} {...field('takenOn')} />
         <TextField label={t('Note (optional)')} value={note} onChange={(e) => setNote(e.target.value)} multiline minRows={2} {...field('note')} />
+        <FormControlLabel
+          control={<Checkbox checked={patientVisible} onChange={(e) => setPatientVisible(e.target.checked)} />}
+          label={t('Visible to the patient')}
+        />
+        <Typography variant="caption" color="text.secondary" display="block">{t('Patients will see the documents marked this way in their portal, which is not available yet.')}</Typography>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={state.isLoading}>{t('Cancel')}</Button>
@@ -158,12 +180,18 @@ export function DocumentsSection({
               {rows.map((d) => (
                 <TableRow key={d.id} hover>
                   <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                    <Preview doc={d} onOpen={() => setViewing(pictures.findIndex((p) => p.id === d.id))} />
+                    <Box sx={{ minWidth: 0 }}>
                     {d.isImage ? (
                       <Link component="button" type="button" underline="hover" onClick={() => setViewing(pictures.findIndex((p) => p.id === d.id))} sx={{ textAlign: 'start' }}>{d.title}</Link>
                     ) : (
                       <Link href={fileUrl(d)} target="_blank" rel="noopener" underline="hover">{d.title}</Link>
                     )}
                     {d.note && <Typography variant="caption" color="text.secondary" display="block">{d.note}</Typography>}
+                    {d.patientVisible && <Chip size="small" icon={<VisibilityIcon />} label={t('Visible to the patient')} sx={{ mt: 0.5 }} />}
+                    </Box>
+                    </Box>
                   </TableCell>
                   <TableCell><Chip size="small" icon={d.isImage ? <ImageIcon /> : <PictureAsPdfIcon />} label={t(DOCUMENT_CATEGORY_LABEL[d.category])} /></TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>{d.takenOn ? formatDate(d.takenOn) : '—'}</TableCell>

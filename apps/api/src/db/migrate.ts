@@ -1,5 +1,6 @@
 import type { Knex } from 'knex';
 import * as m001 from './migrations/001_initial_schema';
+import * as m002 from './migrations/002_document_patient_visibility';
 
 type Migration = { up(k: Knex): Promise<void>; down(k: Knex): Promise<void> };
 
@@ -8,7 +9,10 @@ type Migration = { up(k: Knex): Promise<void>; down(k: Knex): Promise<void> };
 // every change is a new numbered file added to this list; never edit one that has been applied anywhere.
 const migrations: Record<string, Migration> = {
   '001_initial_schema': m001,
+  '002_document_patient_visibility': m002,
 };
+
+export const migrationNames = Object.keys(migrations).sort();
 
 const migrationSource: Knex.MigrationSource<string> = {
   getMigrations: async () => Object.keys(migrations).sort(),

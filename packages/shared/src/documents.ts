@@ -28,6 +28,8 @@ export const documentUploadSchema = z.object({
   takenOn: optionalDate,
   appointmentId: optionalId,
   note: optionalText(500),
+  /** Mark it as one the patient may see in the portal (phase 8); off by default. */
+  patientVisible: z.enum(['1']).optional(),
   /** The file's name on the person's computer, for display. */
   name: z.preprocess((v) => (typeof v === 'string' ? v : ''), text(255)).optional(),
   /** Upload even if this patient already has exactly this file. */
@@ -42,6 +44,7 @@ export const documentUpdateSchema = z
     takenOn: optionalDate,
     appointmentId: optionalId,
     note: optionalText(500),
+    patientVisible: z.boolean(),
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, 'Nothing to update');
@@ -59,6 +62,8 @@ export interface PatientDocumentDto {
   mime: string;
   sizeBytes: number;
   isImage: boolean;
+  /** Marked as one the patient may see in the portal (not shown to patients yet: phase 8). */
+  patientVisible: boolean;
   appointment: { id: number; date: string; time: string } | null;
   uploadedBy: { id: number; name: string } | null;
   createdAt: string | null;

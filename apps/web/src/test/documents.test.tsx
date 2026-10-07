@@ -9,7 +9,7 @@ const api = useFakeApi();
 const CONFIG = { defaultDuration: 30, durationStep: 15, minDuration: 15, maxDuration: 480, cancelMinHours: 24, timezone: 'Asia/Beirut', today: '2026-10-05' };
 const doc = (extra: object = {}) => ({
   id: 1, patientId: 7, category: 'xray', title: 'Upper right', takenOn: '2026-10-01', note: null, fileName: 'scan.png', mime: 'image/png', sizeBytes: 2_500_000, isImage: true,
-  appointment: null, uploadedBy: { id: 4, name: 'Sam Staff' }, createdAt: '2026-10-01 09:00:00', canChange: true, ...extra,
+  appointment: null, patientVisible: false, uploadedBy: { id: 4, name: 'Sam Staff' }, createdAt: '2026-10-01 09:00:00', canChange: true, ...extra,
 });
 const pdfDoc = (extra: object = {}) => doc({ id: 2, category: 'blood_test', title: 'Blood results', mime: 'application/pdf', isImage: false, sizeBytes: 90_000, takenOn: '2026-09-20', ...extra });
 const list = (data: unknown[]) => json(200, { data, meta: { page: 1, pageSize: 200, total: data.length } });
@@ -50,6 +50,44 @@ describe('the patient’s documents page', () => {
     const pdfRow = section.getByText('Blood results').closest('tr') as HTMLElement;
     expect(within(pdfRow).getByText('Blood test')).toBeInTheDocument();
     expect(within(pdfRow).getByText('88 KB')).toBeInTheDocument();
+  });
+
+  it('shows a small preview of each picture, an icon for a PDF, and an icon when the preview cannot be loaded', async () => {
+    const section = await open('staff', [doc(), pdfDoc(), doc({ id: 3, title: 'Broken one' })]);
+    const row = (await section.findByText('Upper right')).closest('tr') as HTMLElement;
+    const img = row.querySelector('img') as HTMLImageElement;
+    expect(img).toHaveAttribute('src', '/api/v1/documents/1/thumbnail');
+    expect(img).toHaveAttribute('loading', 'lazy');
+    expect(img).toHaveAttribute('alt', ''); // the title beside it says what it is
+    expect((section.getByText('Blood results').closest('tr') as HTMLElement).querySelector('img')).toBeNull();
+    const broken = (section.getByText('Broken one').closest('tr') as HTMLElement).querySelector('img') as HTMLImageElement;
+    fireEvent.error(broken); // the server had no preview for it
+    await waitFor(() => expect((section.getByText('Broken one').closest('tr') as HTMLElement).querySelector('img')).toBeNull());
+    expect(within(section.getByText('Broken one').closest('tr') as HTMLElement).getByRole('button', { name: 'Open Broken one' })).toBeInTheDocument(); // still opens
+  });
+
+  it('opens the viewer from the preview', async () => {
+    const section = await open();
+    const row = (await section.findByText('Upper right')).closest('tr') as HTMLElement;
+    await userEvent.click(within(row).getAllByRole('button', { name: 'Open Upper right' })[0]!);
+    expect(await screen.findByRole('dialog', { name: /Upper right/ })).toBeInTheDocument();
+  });
+
+  it('marks a document that is visible to the patient', async () => {
+    const section = await open('staff', [doc({ patientVisible: true }), pdfDoc()]);
+    const row = (await section.findByText('Upper right')).closest('tr') as HTMLElement;
+    expect(within(row).getByText('Visible to the patient')).toBeInTheDocument();
+    expect(within(section.getByText('Blood results').closest('tr') as HTMLElement).queryByText('Visible to the patient')).not.toBeInTheDocument();
+  });
+
+  it('changes whether the patient may see a document', async () => {
+    const section = await open();
+    api.routes['PATCH /documents/1'] = () => json(200, { document: doc({ patientVisible: true }) });
+    await userEvent.click(await section.findByRole('button', { name: 'Edit Upper right' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Edit document' });
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Visible to the patient' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(lastCall('PATCH', '/documents/1').body).toMatchObject({ patientVisible: true }));
   });
 
   it('says so when there are none, and when a filter finds none', async () => {
@@ -159,6 +197,17 @@ describe('adding documents', () => {
     expect(second!.headers.get('content-type')).toBe('application/pdf');
     expect(await screen.findByText('Document added')).toBeInTheDocument();
     await waitFor(() => expect(within(dialog).getAllByText('Added')).toHaveLength(2));
+  });
+
+  it('sends the choice to make a file visible to the patient, and nothing when it is not made', async () => {
+    const dialog = await choose([file('a.png', 'image/png', 50), file('b.png', 'image/png', 60)]);
+    api.routes['POST /patients/7/documents'] = () => json(201, { document: doc() });
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Visible to the patient, file 2' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Add 2 documents' }));
+    await waitFor(() => expect(api.calls.filter((c) => c.method === 'POST' && c.path === '/patients/7/documents')).toHaveLength(2));
+    const [first, second] = api.calls.filter((c) => c.method === 'POST' && c.path === '/patients/7/documents');
+    expect(first!.query.get('patientVisible')).toBeNull();
+    expect(second!.query.get('patientVisible')).toBe('1');
   });
 
   it('refuses a file of the wrong type or over 25 MB before sending anything', async () => {

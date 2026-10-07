@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { parseEnv } from '../src/config/env';
 import { createDb, type Db } from '../src/db/connection';
-import { migrationConfig, migrateLatest } from '../src/db/migrate';
+import { migrationConfig, migrationNames, migrateLatest } from '../src/db/migrate';
 import { TEETH, createFirstAdmin, seedTeeth } from '../src/db/setup';
 import { verifyPassword } from '../src/lib/password';
 
@@ -16,7 +16,7 @@ const fresh = (): Db => (db = createDb(parseEnv({ DB_FILENAME: ':memory:', JWT_S
 describe('the schema (one migration, for a new installation)', () => {
   it('creates every table, with consistent foreign keys, and rolls back to nothing', async () => {
     const conn = fresh();
-    expect(await migrateLatest(conn)).toEqual(['001_initial_schema']);
+    expect(await migrateLatest(conn)).toEqual(migrationNames);
     expect(await migrateLatest(conn)).toEqual([]); // nothing left to do
     const tables = ((await conn.raw("SELECT name FROM sqlite_master WHERE type = 'table'")) as { name: string }[]).map((t) => t.name);
     expect(tables).toEqual(expect.arrayContaining([
@@ -29,7 +29,7 @@ describe('the schema (one migration, for a new installation)', () => {
     expect(offerColumns).not.toContain('start_date'); // dates belong to the booked visits
     expect(Object.keys(await conn('payments').columnInfo())).toContain('offer_id');
 
-    await conn.migrate.down(migrationConfig);
+    await conn.migrate.rollback(migrationConfig, true); // every migration, newest first
     const left = ((await conn.raw("SELECT name FROM sqlite_master WHERE type = 'table'")) as { name: string }[]).map((t) => t.name).filter((n) => !n.startsWith('knex_') && n !== 'sqlite_sequence');
     expect(left).toEqual([]);
   });

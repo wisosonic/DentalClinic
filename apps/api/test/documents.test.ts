@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import bcrypt from 'bcryptjs';
+import sharp from 'sharp';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { NOW, PASSWORD, buildTestApp, loggedIn, seedClinic, type Client, type Seed, type TestApp } from './helpers';
 
@@ -285,5 +286,100 @@ describe('the activity log', () => {
     expect(rows.map((r) => r.action)).toEqual(['document.upload', 'document.update', 'document.view', 'document.delete']); // one view: the list and the file are one visit
     expect(JSON.parse(rows[0]!.diff)).toMatchObject({ patientId: s.patientId, category: 'xray', bytes: png().length });
     expect(JSON.stringify(rows)).not.toMatch(/secret/i);
+  });
+});
+
+describe('thumbnails', () => {
+  const real = async (w = 600, h = 400, extra = 0) => sharp({ create: { width: w, height: h, channels: 3, background: { r: 200 - extra, g: 50, b: 50 } } }).png().toBuffer();
+  const thumbs = () => stored().filter((n) => n.endsWith('.thumb.webp'));
+
+  it('makes a small WebP preview of a picture when it is added, and serves it with the same protective headers', async () => {
+    const doc = (await upload(staff, s.patientId, await real(), { title: 'Real' })).body.document;
+    expect(thumbs()).toHaveLength(1);
+    const res = await fetchFile(aya, `/documents/${doc.id}/thumbnail`);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toBe('image/webp');
+    expect(res.headers['cache-control']).toContain('no-store');
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+    expect(res.headers['content-security-policy']).toContain('sandbox');
+    const meta = await sharp(res.body as Buffer).metadata();
+    expect(meta.format).toBe('webp');
+    expect(Math.max(meta.width!, meta.height!)).toBe(256); // the longest side, never enlarged
+    expect((res.body as Buffer).length).toBeLessThan((await real()).length);
+  });
+
+  it('does not enlarge a small picture, and keeps a PDF without one', async () => {
+    const small = (await upload(staff, s.patientId, await real(80, 40), { title: 'Small' })).body.document;
+    const meta = await sharp((await fetchFile(admin, `/documents/${small.id}/thumbnail`)).body as Buffer).metadata();
+    expect([meta.width, meta.height]).toEqual([80, 40]);
+    const p = (await upload(staff, s.patientId, pdf(), { category: 'cbct', title: 'Report' }, 'application/pdf')).body.document;
+    expect((await fetchFile(admin, `/documents/${p.id}/thumbnail`)).status).toBe(404);
+  });
+
+  it('still accepts a picture it cannot shrink, and says there is no preview', async () => {
+    const doc = await make(staff); // the test picture is only the first bytes of a PNG
+    expect(thumbs()).toEqual([]);
+    expect((await fetchFile(admin, `/documents/${doc.id}/thumbnail`)).status).toBe(404);
+  });
+
+  it('makes a missing preview on first request (pictures added earlier have none)', async () => {
+    const doc = (await upload(staff, s.patientId, await real(300, 300, 1), { title: 'Old' })).body.document;
+    for (const n of thumbs()) await rm(path.join(uploads, 'documents', n));
+    expect((await fetchFile(admin, `/documents/${doc.id}/thumbnail`)).status).toBe(200);
+    expect(thumbs()).toHaveLength(1);
+  });
+
+  it('follows the same access rules as the file', async () => {
+    const doc = (await upload(staff, s.patientId, await real(100, 100, 2), { title: 'Mine' })).body.document;
+    expect((await fetchFile(patient, `/documents/${doc.id}/thumbnail`)).status).toBe(403);
+    expect((await fetchFile(t.client(), `/documents/${doc.id}/thumbnail`)).status).toBe(401);
+    expect((await fetchFile(ext, `/documents/${doc.id}/thumbnail`)).status).toBe(404); // an owner's patient, seen by an outside specialist
+    expect((await fetchFile(admin, '/documents/99999/thumbnail')).status).toBe(404);
+  });
+
+  it('is erased with the picture, whichever way it goes', async () => {
+    const doc = (await upload(staff, s.patientId, await real(100, 100, 3), { title: 'Gone' })).body.document;
+    expect(stored()).toHaveLength(2);
+    await staff.send('delete', `/documents/${doc.id}`);
+    expect(stored()).toHaveLength(2); // in the Trash: kept
+    const res = await admin.agent.delete(`/api/v1/trash/document/${doc.id}`).set('x-csrf-token', admin.csrf).send({ confirm: 'Pat Patient' });
+    expect(res.status).toBe(204);
+    expect(stored()).toEqual([]);
+  });
+
+  it('carries no metadata from the original (position, camera) into the preview', async () => {
+    const withExif = await sharp(await real(300, 200, 4)).withExif({ IFD0: { Copyright: 'Patient Name' } }).jpeg().toBuffer();
+    const doc = (await upload(staff, s.patientId, withExif, { title: 'Exif' }, 'image/jpeg')).body.document;
+    const meta = await sharp((await fetchFile(admin, `/documents/${doc.id}/thumbnail`)).body as Buffer).metadata();
+    expect(meta.exif).toBeUndefined();
+  });
+});
+
+describe('visible to the patient (for the portal, phase 8)', () => {
+  it('is off unless chosen, can be chosen when adding, and changed by the uploader and admin only', async () => {
+    const plain = await make(staff, s.patientId, { title: 'A' });
+    expect(plain.patientVisible).toBe(false);
+    const shared = await make(staff, s.patientId, { title: 'B', patientVisible: '1' });
+    expect(shared.patientVisible).toBe(true);
+    const listed = (await admin.get(`/patients/${s.patientId}/documents`)).body.data as { title: string; patientVisible: boolean }[];
+    expect(Object.fromEntries(listed.map((d) => [d.title, d.patientVisible]))).toEqual({ A: false, B: true });
+
+    expect((await staff.send('patch', `/documents/${plain.id}`, { patientVisible: true })).body.document.patientVisible).toBe(true);
+    expect((await aya.send('patch', `/documents/${plain.id}`, { patientVisible: false })).status).toBe(403); // not his upload
+    expect((await admin.send('patch', `/documents/${plain.id}`, { patientVisible: false })).body.document.patientVisible).toBe(false);
+    expect((await staff.send('patch', `/documents/${plain.id}`, { patientVisible: 'yes' })).status).toBe(400);
+  });
+
+  it('is still hidden from a patient: the portal comes later', async () => {
+    const doc = await make(staff, s.patientId, { patientVisible: '1' });
+    expect((await patient.get(`/patients/${s.patientId}/documents`)).status).toBe(403);
+    expect((await fetchFile(patient, `/documents/${doc.id}/file`)).status).toBe(403);
+  });
+
+  it('logs the change by field name only', async () => {
+    const doc = await make(staff);
+    await staff.send('patch', `/documents/${doc.id}`, { patientVisible: true });
+    const entry = await t.db('audit_log').where({ action: 'document.update' }).first();
+    expect(JSON.parse(entry.diff)).toEqual({ fields: ['patientVisible'] });
   });
 });

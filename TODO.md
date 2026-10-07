@@ -21,24 +21,13 @@ Phase 7 is built (see CLAUDE.md). Left:
 
 ---
 
-## Treatment offers follow-ups
-
-The statuses are now draft, accepted and cancelled (migration 022 applies by itself when the API starts; it cannot be rolled back).
-
-The merge is built (see CLAUDE.md and section 13.2 of the plan). Left:
-
-- [ ] **Before the first real deployment, back up the database:** migration 020 (treatment offers) cannot be rolled back, and it applies by itself when the API starts. (The dev database was migrated on 2026-10-06: 70 offers, $7,850 and 78 payments, $5,485, all unchanged.)
-
----
-
 ## Patient documents follow-ups
 
-The documents are built (see CLAUDE.md). Left:
+The documents, their previews and the "visible to the patient" mark are built (see CLAUDE.md). Left:
 
-- [ ] Look at the Documents section on a patient page in the browser, with a real x-ray, a panoramic and a PDF, in both languages and in dark mode
-- [ ] Owner: say if patients should later see some documents in the portal (a "visible to the patient" switch, phase 8), and whether CBCT studies as DICOM/ZIP are needed
-- [ ] Optional: thumbnails for pictures, and linking a document to a visit in the screens (the API already takes the visit)
-- [ ] Back up `UPLOAD_DIR` (it now holds patient health data) with the database, and encrypt the server disk before launch
+- [ ] Phase 8: the portal lists and opens the documents marked **Visible to the patient** (a patient endpoint that checks the mark and `assertPatientAccess`, and a screen)
+- [ ] Optional: link a document to a visit in the screens (the API already takes the visit); DICOM or ZIP studies only if the owner asks
+- [ ] Before launch: encrypt the server disk (the uploads and the database hold patient health data); backups are `npm run db:dump -- --with-uploads`, see the backups item in phase 10
 
 ---
 

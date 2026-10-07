@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseEnv } from '../src/config/env';
 import { createDb, type Db } from '../src/db/connection';
 import { dumpDatabase, stamp } from '../src/db/dump';
-import { migrateLatest } from '../src/db/migrate';
+import { migrateLatest, migrationNames } from '../src/db/migrate';
 import { seedTeeth } from '../src/db/setup';
 
 let dir: string;
@@ -35,7 +35,7 @@ describe('the database dump', () => {
     const copy = new Database(out, { readonly: true });
     expect((copy.prepare('SELECT COUNT(*) AS n FROM teeth').get() as { n: number }).n).toBe(32);
     expect((copy.prepare('SELECT email FROM users').get() as { email: string }).email).toBe('a@clinic.test');
-    expect(copy.prepare('SELECT name FROM knex_migrations').all()).toEqual([{ name: '001_initial_schema' }]); // restores as an up-to-date database
+    expect(copy.prepare('SELECT name FROM knex_migrations ORDER BY id').all()).toEqual(migrationNames.map((name) => ({ name }))); // restores as an up-to-date database
     copy.close();
   });
 
