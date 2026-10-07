@@ -84,7 +84,7 @@ export async function revenue(ctx: AppContext, user: AuthUser, p: Period, group:
 
   if (group === 'type') {
     const between = (qb: any, col: string) => qb.where(col, '>=', p.from).where(col, '<=', p.to); // eslint-disable-line @typescript-eslint/no-explicit-any -- Knex builder
-    const pay: Row[] = await db('payments as pay').leftJoin('quotes as q', 'q.id', 'pay.quote_id').leftJoin('patients as pt', 'pt.id', 'q.patient_id').whereNull('pay.deleted_at')
+    const pay: Row[] = await db('payments as pay').leftJoin('treatment_offers as q', 'q.id', 'pay.offer_id').leftJoin('patients as pt', 'pt.id', 'q.patient_id').whereNull('pay.deleted_at')
       .whereRaw("(pay.type = 'commission' OR (pay.type = 'clinic' AND q.deleted_at IS NULL AND pt.deleted_at IS NULL))").modify((qb) => between(qb, 'pay.date'))
       .modify((qb) => { if (mine !== null) qb.where('pay.type', 'clinic').where('pt.doctor_id', mine); else if (!scope.all) qb.whereRaw('1 = 0'); })
       .select('pay.type').sum({ total: 'pay.amount' }).count({ n: '*' }).groupBy('pay.type');
@@ -103,7 +103,7 @@ export async function revenue(ctx: AppContext, user: AuthUser, p: Period, group:
   }
 
   // by doctor: who collected what (admin only)
-  const rows: Row[] = await db('payments as pay').leftJoin('doctors as d', 'd.id', 'pay.collected_by_doctor_id').leftJoin('quotes as q', 'q.id', 'pay.quote_id').leftJoin('patients as pt', 'pt.id', 'q.patient_id')
+  const rows: Row[] = await db('payments as pay').leftJoin('doctors as d', 'd.id', 'pay.collected_by_doctor_id').leftJoin('treatment_offers as q', 'q.id', 'pay.offer_id').leftJoin('patients as pt', 'pt.id', 'q.patient_id')
     .whereNull('pay.deleted_at').whereRaw("(pay.type = 'commission' OR (pay.type = 'clinic' AND q.deleted_at IS NULL AND pt.deleted_at IS NULL))")
     .where('pay.date', '>=', p.from).where('pay.date', '<=', p.to).select('d.id', 'd.fname', 'd.lname', 'pay.type').sum({ total: 'pay.amount' }).count({ n: '*' }).groupBy('d.id', 'd.fname', 'd.lname', 'pay.type');
   const byDoctor = new Map<string, { doctor: string; collected: number; commission: number; count: number }>();

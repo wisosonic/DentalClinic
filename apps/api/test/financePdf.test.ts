@@ -14,7 +14,7 @@ beforeAll(async () => {
 });
 afterAll(() => t.destroy());
 beforeEach(async () => {
-  for (const table of ['payments', 'offer_items', 'quotes', 'audit_log']) await t.db(table).del();
+  for (const table of ['payments', 'offer_items', 'treatment_offers', 'audit_log']) await t.db(table).del();
 });
 
 const pdf = (c: Client, url: string) => c.agent.get(`/api/v1${url}`).buffer(true).parse((res, cb) => {
@@ -33,12 +33,12 @@ const text = (res: { body: unknown }) => {
 };
 
 async function make(patientId = s.patientId, extra: object = {}) {
-  const quote = (await t.db('quotes').insert({ title: 'Zirconia crown', description: 'Upper left molar', type: 'clinic', price: 480, cost: 123.45, currency: '$', status: 'accepted', patient_id: patientId, ...stamp, ...extra }))[0]!;
+  const quote = (await t.db('treatment_offers').insert({ title: 'Zirconia crown', description: 'Upper left molar', type: 'clinic', price: 480, cost: 123.45, currency: '$', status: 'accepted', patient_id: patientId, ...stamp, ...extra }))[0]!;
   await t.db('offer_items').insert({ offer_id: quote, description: 'Zirconia crown', price: 480, cost: 123.45, sequence: 1, status: 'pending', ...stamp });
   return quote;
 }
 const payment = async (quote: number, extra: object = {}) =>
-  (await t.db('payments').insert({ date: TODAY, type: 'clinic', amount: 100, remaining: 380, currency: '$', method: 'card', description: 'First instalment', quote_id: quote, collected_by_doctor_id: s.doctorId, dr_part: 100, created_by: 1, ...stamp, ...extra }))[0]!;
+  (await t.db('payments').insert({ date: TODAY, type: 'clinic', amount: 100, remaining: 380, currency: '$', method: 'card', description: 'First instalment', offer_id: quote, collected_by_doctor_id: s.doctorId, dr_part: 100, created_by: 1, ...stamp, ...extra }))[0]!;
 
 describe('offer PDF', () => {
   it('is a PDF with the clinic, patient, items and total, and never the clinic’s cost', async () => {
@@ -65,7 +65,7 @@ describe('offer PDF', () => {
   it('lists every item with its price and tooth', async () => {
     const q = await make();
     await t.db('offer_items').insert({ offer_id: q, description: 'Whitening', price: 80, sequence: 2, status: 'pending', ...stamp });
-    await t.db('quotes').where({ id: q }).update({ price: 560 });
+    await t.db('treatment_offers').where({ id: q }).update({ price: 560 });
     const body = text(await pdf(admin, `/treatment-offers/${q}/pdf`));
     for (const part of ['1. Zirconia crown', '2. Whitening', '$80.00', '$560.00']) expect(body, part).toContain(part);
   });
@@ -88,7 +88,7 @@ describe('offer PDF', () => {
     const entry = await t.db('audit_log').where({ action: 'offer.pdf' }).first();
     expect(entry).toMatchObject({ entity: 'offer', entity_id: String(q) });
     expect(JSON.stringify(entry)).not.toContain('Zirconia');
-    await t.db('quotes').where({ id: q }).update({ deleted_at: '2026-10-01 00:00:00' });
+    await t.db('treatment_offers').where({ id: q }).update({ deleted_at: '2026-10-01 00:00:00' });
     expect((await pdf(admin, `/treatment-offers/${q}/pdf`)).status).toBe(404);
   });
 });
@@ -143,7 +143,7 @@ describe('receipt PDF', () => {
     const p = await payment(q);
     await t.db('payments').where({ id: p }).update({ deleted_at: '2026-10-01 00:00:00' });
     expect((await pdf(admin, `/payments/${p}/receipt`)).status).toBe(404);
-    const commission = (await t.db('payments').insert({ date: TODAY, type: 'commission', amount: 20, currency: '$', quote_id: null, dr_part: 100, ...stamp }))[0]!;
+    const commission = (await t.db('payments').insert({ date: TODAY, type: 'commission', amount: 20, currency: '$', offer_id: null, dr_part: 100, ...stamp }))[0]!;
     expect((await pdf(admin, `/payments/${commission}/receipt`)).status).toBe(404);
   });
 });

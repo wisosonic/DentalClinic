@@ -73,6 +73,7 @@ export const TOAST_MESSAGES: Record<string, string> = {
   setOfferItems: 'Treatment offer saved',
   scheduleOfferItem: 'Visit booked',
   markOfferItemDone: 'Marked as done',
+  markOfferItemPending: 'Marked as pending',
   deleteOffer: 'Treatment offer moved to the Trash',
   createLabOrder: 'Lab order added',
   updateLabOrder: 'Lab order saved',

@@ -30,7 +30,7 @@ beforeAll(async () => {
 afterAll(() => t.destroy());
 
 beforeEach(async () => {
-  for (const table of ['payments', 'offer_items', 'quotes', 'audit_log']) await t.db(table).del();
+  for (const table of ['payments', 'offer_items', 'treatment_offers', 'audit_log']) await t.db(table).del();
   await t.db('patients').update({ deleted_at: null });
 });
 
@@ -263,7 +263,7 @@ describe('the Trash and money', () => {
     expect(impact).toMatchObject({ offers: 1, payments: 1 });
     expect((await admin.agent.delete(`/api/v1/trash/offer/${id}`).set('x-csrf-token', admin.csrf).send({ confirm: 'wrong' })).status).toBe(400);
     expect((await admin.agent.delete(`/api/v1/trash/offer/${id}`).set('x-csrf-token', admin.csrf).send({ confirm: 'Pat Patient' })).status).toBe(204);
-    expect(await t.db('quotes').first()).toBeUndefined();
+    expect(await t.db('treatment_offers').first()).toBeUndefined();
     expect(await t.db('offer_items').first()).toBeUndefined();
     expect(await t.db('payments').first()).toBeUndefined();
     expect(await t.db('patients').where({ id: ayaPatient }).first()).toBeTruthy();

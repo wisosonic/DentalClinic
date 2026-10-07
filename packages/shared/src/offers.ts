@@ -6,7 +6,8 @@ const text = (max: number) => z.string().trim().max(max);
 const optionalText = (max: number) =>
   z.preprocess((v) => (typeof v === 'string' && v.trim() === '' ? null : v), text(max).nullable().optional());
 const optionalDate = z.preprocess((v) => (v === '' ? null : v), dateSchema.nullable().optional());
-const optionalId = z.preprocess((v) => (v === '' || v === 0 ? null : v), idSchema.nullable().optional());
+// the form's selects hold ids as strings, so coerce (a string id used to fail here with no field to show it on)
+const optionalId = z.preprocess((v) => (v === '' || v === 0 || v === '0' ? null : v), z.coerce.number().int().positive().nullable().optional());
 
 // ---------------------------------------------------------------------------
 // Treatment offers: what will be done, what it costs, what the patient agreed to and what was paid.

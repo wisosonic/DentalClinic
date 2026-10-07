@@ -105,13 +105,13 @@ beforeAll(async () => {
 });
 afterAll(() => t.destroy());
 beforeEach(async () => {
-  for (const table of ['tax_declarations', 'payments', 'quotes', 'expenses', 'tax_rule_sets', 'audit_log']) await t.db(table).del();
+  for (const table of ['tax_declarations', 'payments', 'treatment_offers', 'expenses', 'tax_rule_sets', 'audit_log']) await t.db(table).del();
   await t.db('doctors').update({ tax_spouse: false, tax_children: 0 });
 });
 
-const quote = async (patient_id: number) => (await t.db('quotes').insert({ title: 'Q', type: 'clinic', price: 1e7, cost: 0, currency: '$', status: 'accepted', patient_id, ...stamp }))[0]!;
-const pay = (quote_id: number, amount: number, date: string, extra: object = {}) =>
-  t.db('payments').insert({ date, type: 'clinic', amount, currency: '$', quote_id, dr_part: 100, collected_by_doctor_id: s.doctorId, ...stamp, ...extra });
+const quote = async (patient_id: number) => (await t.db('treatment_offers').insert({ title: 'Q', type: 'clinic', price: 1e7, cost: 0, currency: '$', status: 'accepted', patient_id, ...stamp }))[0]!;
+const pay = (offer_id: number, amount: number, date: string, extra: object = {}) =>
+  t.db('payments').insert({ date, type: 'clinic', amount, currency: '$', offer_id, dr_part: 100, collected_by_doctor_id: s.doctorId, ...stamp, ...extra });
 const tax = async (qs: string, c: Client = admin) => (await c.get(`/finance/tax?${qs}`)).body;
 const rules = (extra: object = {}) => ({ ...S, ...extra });
 
@@ -230,7 +230,7 @@ describe('the tax of the year', () => {
     await pay(q, 100, '2026-04-01');
     await pay(q, 900, '2026-04-02', { deleted_at: '2026-04-03 00:00:00' });
     await pay(gone, 800, '2026-04-02');
-    await t.db('quotes').where({ id: gone }).update({ deleted_at: '2026-04-03 00:00:00' });
+    await t.db('treatment_offers').where({ id: gone }).update({ deleted_at: '2026-04-03 00:00:00' });
     await pay(q, 50, '2026-04-04', { currency: 'EUR' });
     const r = await tax('year=2026');
     expect(r.payments.totalUsd).toBe(100);
@@ -280,10 +280,10 @@ describe('the family details on the doctor’s profile', () => {
 describe('payments are only stored in dollars', () => {
   it('records every payment in USD, whatever the request says, so there is nothing in LBP to add', async () => {
     const q = await quote(s.patientId);
-    await t.db('quotes').where({ id: q }).update({ price: 1000, status: 'accepted' });
+    await t.db('treatment_offers').where({ id: q }).update({ price: 1000, status: 'accepted' });
     const res = await admin.post('/payments', { offerId: q, amount: 100, method: 'cash', date: '2026-10-01', currency: 'LBP' });
     expect(res.status).toBe(201);
-    const rows = await t.db('payments').where({ quote_id: q });
+    const rows = await t.db('payments').where({ offer_id: q });
     expect(rows).toHaveLength(1);
     expect(rows[0].currency).toBe('$');
     expect((await tax('year=2026')).excluded).toEqual([]);

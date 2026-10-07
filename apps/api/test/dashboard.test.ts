@@ -23,13 +23,13 @@ beforeAll(async () => {
 });
 afterAll(() => t.destroy());
 beforeEach(async () => {
-  for (const table of ['payments', 'offer_items', 'quotes', 'expenses', 'appointment_category', 'appointments', 'lab_orders']) await t.db(table).del();
+  for (const table of ['payments', 'offer_items', 'treatment_offers', 'expenses', 'appointment_category', 'appointments', 'lab_orders']) await t.db(table).del();
 });
 
 const charts = async (c: Client) => (await c.get('/dashboard/charts')).body;
 const quote = async (patient_id: number, price: number, status = 'accepted') =>
-  (await t.db('quotes').insert({ title: 'Q', type: 'clinic', price, cost: 0, currency: '$', status, patient_id, ...stamp }))[0]!;
-const pay = (quote_id: number, amount: number, date: string) => t.db('payments').insert({ date, type: 'clinic', amount, currency: '$', quote_id, dr_part: 100, ...stamp });
+  (await t.db('treatment_offers').insert({ title: 'Q', type: 'clinic', price, cost: 0, currency: '$', status, patient_id, ...stamp }))[0]!;
+const pay = (offer_id: number, amount: number, date: string) => t.db('payments').insert({ date, type: 'clinic', amount, currency: '$', offer_id, dr_part: 100, ...stamp });
 const visit = async (patient_id: number, doctor_id: number, date: string, status = 'completed', time = '10:00') =>
   (await t.db('appointments').insert({ date, time, status, patient_id, doctor_id, clinic_id: s.clinicId, unit_id: s.unitId, duration_minutes: 30, ...stamp }))[0]!;
 
@@ -168,7 +168,7 @@ describe('staff', () => {
 
   it('counts accepted offers that still have work to book', async () => {
     const offer = async (status: string, items: string[]) => {
-      const id = (await t.db('quotes').insert({ patient_id: s.patientId, title: 'P', type: 'clinic', price: 10, cost: 0, currency: '$', status, ...stamp }))[0]!;
+      const id = (await t.db('treatment_offers').insert({ patient_id: s.patientId, title: 'P', type: 'clinic', price: 10, cost: 0, currency: '$', status, ...stamp }))[0]!;
       for (const [i, st] of items.entries()) await t.db('offer_items').insert({ offer_id: id, description: `w${i}`, price: 5, sequence: i, status: st, ...stamp });
     };
     await offer('accepted', ['pending', 'done']); await offer('accepted', ['pending']); // two with something left to book

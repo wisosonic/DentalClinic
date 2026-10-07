@@ -31,7 +31,7 @@ beforeAll(async () => {
 });
 afterAll(() => t.destroy());
 beforeEach(async () => {
-  for (const table of ['notifications', 'payments', 'offer_items', 'quotes', 'lab_orders', 'appointment_category', 'appointment_tooth', 'appointments', 'app_settings']) await t.db(table).del();
+  for (const table of ['notifications', 'payments', 'offer_items', 'treatment_offers', 'lab_orders', 'appointment_category', 'appointment_tooth', 'appointments', 'app_settings']) await t.db(table).del();
 });
 
 const ctx = () => ({ db: t.db, env: t.env, logger: pino({ level: 'silent' }), clock: () => NOW });
@@ -272,13 +272,13 @@ describe('the follow-up notifications (no-show, overdue commission, offer visits
     });
     afterEach(async () => {
       await t.db('payments').del();
-      await t.db('quotes').del();
+      await t.db('treatment_offers').del();
       await t.db('appointments').where({ patient_id: extPatient }).del();
       await t.db('patients').where({ id: extPatient }).del();
     });
     const collect = async (date: string, amount: number) => {
-      const quote = (await t.db('quotes').insert({ title: 'Bridge', type: 'clinic', price: 1000, cost: 0, currency: '$', status: 'accepted', patient_id: extPatient, ...stamp }))[0]!;
-      await t.db('payments').insert({ date, type: 'clinic', amount, currency: '$', quote_id: quote, collected_by_doctor_id: s.externalDoctorId, dr_part: 100, ...stamp });
+      const quote = (await t.db('treatment_offers').insert({ title: 'Bridge', type: 'clinic', price: 1000, cost: 0, currency: '$', status: 'accepted', patient_id: extPatient, ...stamp }))[0]!;
+      await t.db('payments').insert({ date, type: 'clinic', amount, currency: '$', offer_id: quote, collected_by_doctor_id: s.externalDoctorId, dr_part: 100, ...stamp });
     };
 
     it('reminds the owner and the admins once a month when a specialist has owed him for over 30 days', async () => {
@@ -312,7 +312,7 @@ describe('the follow-up notifications (no-show, overdue commission, offer visits
 
   describe('an offer visit to book', () => {
     const plan = async (extra: object = {}, items: { description: string; status: string }[] = [{ description: 'Crown 16', status: 'pending' }]) => {
-      const id = (await t.db('quotes').insert({ patient_id: s.patientId, title: 'Rehab', type: 'clinic', price: 10, cost: 0, currency: '$', status: 'accepted', start_date: '2026-10-01', ...stamp, ...extra }))[0]!;
+      const id = (await t.db('treatment_offers').insert({ patient_id: s.patientId, title: 'Rehab', type: 'clinic', price: 10, cost: 0, currency: '$', status: 'accepted', start_date: '2026-10-01', ...stamp, ...extra }))[0]!;
       for (const [i, it] of items.entries()) await t.db('offer_items').insert({ offer_id: id, description: it.description, status: it.status, sequence: i, price: 10, ...stamp });
       return id;
     };

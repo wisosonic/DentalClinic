@@ -263,7 +263,7 @@ export interface AppointmentDto {
   /** Null once the clinic was deleted: the appointment stays, for the payment and tax records, but is read-only. */
   clinicId: number | null;
   unitId: number | null;
-  quoteId: number | null;
+  offerId: number | null;
   patient: { id: number; fname: string; lname: string; phone?: string };
   /**
    * False when the viewer is an external specialist treating another doctor's patient: he sees the

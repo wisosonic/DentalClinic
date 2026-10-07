@@ -77,7 +77,7 @@ export async function toDtos(
     doctorId: r.doctor_id,
     clinicId: r.clinic_id ?? null,
     unitId: r.unit_id ?? null,
-    quoteId: r.quote_id ?? null,
+    offerId: r.offer_id ?? null,
     patientVisible: visible(r),
     patient: { id: r.patient_id, fname: r.p_fname, lname: r.p_lname, ...(opts.staff && visible(r) ? { phone: r.p_phone } : {}) },
     doctor: { id: r.doctor_id, fname: r.d_fname, lname: r.d_lname },

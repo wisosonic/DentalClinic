@@ -137,7 +137,7 @@ describe('a treatment offer', () => {
     const row = screen.getByText('Root canal').closest('tr') as HTMLElement;
     expect(within(row).getByText('Booked')).toBeInTheDocument();
     expect(within(row).getByText('10:00')).toBeInTheDocument();
-    expect(within(row).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(row).queryByRole('button', { name: /Book a visit/ })).not.toBeInTheDocument();
   });
 
   it('asks for nothing more on a new offer (it is accepted already), only to cancel or change it', async () => {
@@ -238,6 +238,24 @@ describe('a treatment offer', () => {
     expect(await screen.findByText('Marked as done')).toBeInTheDocument();
   });
 
+  it('puts a booked or finished work back to pending, and books one visit for several chosen works', async () => {
+    await open('doctor', offer({ items: [
+      item({ status: 'done' }), item({ id: 2, sequence: 2, description: 'Crown', status: 'scheduled', appointment: { id: 5, date: '2026-10-06', time: '10:00', status: 'confirmed' } }),
+      item({ id: 3, sequence: 3, description: 'Filling' }), item({ id: 4, sequence: 4, description: 'Cleaning' }),
+    ] }), DOCTOR);
+    api.routes['POST /treatment-offers/9/items/1/pending'] = () => json(200, { offer: offer() });
+    await userEvent.click(screen.getByRole('button', { name: 'Mark Root canal as pending' }));
+    await waitFor(() => expect(api.calls.some((c) => c.path === '/treatment-offers/9/items/1/pending')).toBe(true));
+    expect(await screen.findByText('Marked as pending')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Mark Crown as done' })).toBeInTheDocument(); // a booked work can be marked done after the visit
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Filling for one visit' }));
+    expect(screen.queryByRole('button', { name: /Book one visit/ })).not.toBeInTheDocument(); // one is not "several"
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Cleaning for one visit' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Book one visit for the 2 selected works' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByLabelText('Reason / notes')).toHaveValue('Filling, Cleaning');
+  });
+
   it('shows the server’s refusal in the language of the screen', async () => {
     await open('doctor', offer({ status: 'draft' }), DOCTOR);
     api.routes['POST /treatment-offers/9/accept'] = () => json(409, { error: { code: 'EMPTY_OFFER', message: 'Add at least one item first' } });
@@ -319,5 +337,14 @@ describe('the treatment offer form', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Create offer' }));
     expect(await within(dialog).findByText('Use at most two decimals')).toBeInTheDocument();
     expect(api.calls.some((c) => c.method === 'POST')).toBe(false);
+  });
+});
+
+describe('the offer form’s ids', () => {
+  it('accepts a procedure and a tooth chosen in the form, which arrive as text', async () => {
+    const { offerInputSchema } = await import('@aya/shared');
+    const parsed = offerInputSchema.safeParse({ patientId: 7, title: 'Crown', items: [{ description: 'Crown', categoryId: '5', toothId: '12', price: '100', cost: '' }, { description: 'Check', categoryId: '', toothId: '', price: 0 }] });
+    expect(parsed.success).toBe(true);
+    expect(parsed.data!.items.map((i) => [i.categoryId, i.toothId])).toEqual([[5, 12], [null, null]]);
   });
 });

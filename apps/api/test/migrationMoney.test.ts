@@ -21,8 +21,8 @@ async function beforeMoney(): Promise<Db> {
     (await conn('quotes').insert({ title: 'Q', type: 'clinic', price, cost: 0, currency: '$', status, patient_id, ...stamp }))[0]!;
   const q1 = await quote(patient!, 300.1, 'pending');
   const q2 = await quote(orphan!, 100, 'paid');
-  const pay = (quote_id: number | null, amount: number, date: string, remaining: number | null, type = 'clinic') =>
-    conn('payments').insert({ quote_id, amount, date, remaining, type, currency: '$', dr_part: 100, ...stamp });
+  const pay = (offer_id: number | null, amount: number, date: string, remaining: number | null, type = 'clinic') =>
+    conn('payments').insert({ quote_id: offer_id, amount, date, remaining, type, currency: '$', dr_part: 100, ...stamp });
   await pay(q1, 100.05, '2025-11-02', 999); // wrong balance
   await pay(q1, 50.05, '2025-11-05', null);
   await pay(q2, 100, '2025-11-03', 0);

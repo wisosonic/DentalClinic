@@ -64,7 +64,7 @@ export const UNIT = { id: 1, clinicId: 1, name: "Dr Aya's unit", ownerDoctorId: 
 
 export function appointment(extra: object = {}) {
   return {
-    id: 5, date: '2026-10-06', time: '10:00', durationMinutes: 30, endTime: '10:30', status: 'confirmed', intended: null, patientId: 7, doctorId: 1, clinicId: 1, unitId: 1, quoteId: null,
+    id: 5, date: '2026-10-06', time: '10:00', durationMinutes: 30, endTime: '10:30', status: 'confirmed', intended: null, patientId: 7, doctorId: 1, clinicId: 1, unitId: 1, offerId: null,
     patient: { id: 7, fname: 'Hicham', lname: 'Cheaib', phone: '03039198' }, doctor: { id: 1, fname: 'Aya', lname: 'Al Ghali' },
     clinic: { id: 1, name: 'Aya Ghali Clinic' }, unit: { id: 1, name: "Dr Aya's unit", ownerDoctorId: 1 }, categories: [], ...extra,
   };

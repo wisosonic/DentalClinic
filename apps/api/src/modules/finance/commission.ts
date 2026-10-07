@@ -38,7 +38,7 @@ export async function commissionStatement(db: Db, from: string | undefined, to: 
 
   // Money the specialists collected from patients (clinic payments of their own patients).
   const collected: Row[] = specialists.length
-    ? await db('payments as pay').join('quotes as q', 'q.id', 'pay.quote_id').join('patients as p', 'p.id', 'q.patient_id')
+    ? await db('payments as pay').join('treatment_offers as q', 'q.id', 'pay.offer_id').join('patients as p', 'p.id', 'q.patient_id')
         .where('pay.type', 'clinic').whereNull('pay.deleted_at').whereNull('q.deleted_at').whereNull('p.deleted_at')
         .whereIn('p.doctor_id', specialists.map((d) => d.id)).where('pay.date', '<=', end)
         .select('pay.id', 'pay.date', 'pay.amount', 'p.id as patient_id', 'p.doctor_id')
@@ -208,7 +208,7 @@ export function commissionRouter(ctx: AppContext): Router {
     const now = sqlNow();
     const [id] = await db('payments').insert({
       date: input.date, type: 'commission', amount: input.amount, remaining: null, currency: '$', description: input.description ?? null, method: input.method,
-      quote_id: null, model_id: input.specialistId, collected_by_doctor_id: input.ownerId, dr_part: 100, created_by: user.id, created_at: now, updated_at: now,
+      offer_id: null, model_id: input.specialistId, collected_by_doctor_id: input.ownerId, dr_part: 100, created_by: user.id, created_at: now, updated_at: now,
     });
     await audit(ctx, req, { userId: user.id, action: 'commission.payment.create', entity: 'payment', entityId: id as number, diff: { specialistId: input.specialistId, ownerId: input.ownerId, amount: input.amount } });
     res.status(201).json({ payment: toPaymentDto((await payments().where('pay.id', id).first())!) });

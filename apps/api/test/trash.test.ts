@@ -19,7 +19,7 @@ afterAll(() => t.destroy());
 
 let apptId: number;
 let reportId: number;
-let quoteId: number;
+let offerId: number;
 let savedPatient: Record<string, unknown>;
 let savedLogin: Record<string, unknown>;
 
@@ -28,7 +28,7 @@ beforeEach(async () => {
   // An earlier test may have erased the patient for good: put them back.
   if (!(await t.db('users').where({ id: s.patientUserId }).first())) await t.db('users').insert(savedLogin);
   if (!(await t.db('patients').where({ id: s.patientId }).first())) await t.db('patients').insert(savedPatient);
-  for (const table of ['medication_report', 'report_tooth', 'reports', 'payments', 'quotes', 'appointment_category', 'appointment_tooth', 'appointments', 'audit_log']) await t.db(table).del();
+  for (const table of ['medication_report', 'report_tooth', 'reports', 'payments', 'treatment_offers', 'appointment_category', 'appointment_tooth', 'appointments', 'audit_log']) await t.db(table).del();
   await t.db('patients').update({ deleted_at: null, deleted_by: null });
   apptId = (await t.db('appointments').insert({
     date: TOMORROW, time: '10:00', status: 'completed', patient_id: s.patientId, doctor_id: s.doctorId, clinic_id: s.clinicId, unit_id: s.unitId, duration_minutes: 30, ...stamp,
@@ -38,8 +38,8 @@ beforeEach(async () => {
   await t.db('report_tooth').insert({ report_id: reportId, tooth_id: s.toothIds[0], date: TOMORROW, occlusal: 'Secret cavity', ...stamp });
   const med = (await t.db('medications').insert({ name: 'Amoxicillin', ...stamp }))[0]!;
   await t.db('medication_report').insert({ report_id: reportId, medication_id: med, dose: '500 mg', frequency: 3, time_unit: 'day', ...stamp });
-  quoteId = (await t.db('quotes').insert({ title: 'Crown', type: 'treatment', price: 100, cost: 40, currency: '$', status: 'accepted', patient_id: s.patientId, ...stamp }))[0]!;
-  await t.db('payments').insert({ date: TODAY, type: 'clinic', amount: 50, remaining: 50, currency: '$', quote_id: quoteId, ...stamp });
+  offerId = (await t.db('treatment_offers').insert({ title: 'Crown', type: 'treatment', price: 100, cost: 40, currency: '$', status: 'accepted', patient_id: s.patientId, ...stamp }))[0]!;
+  await t.db('payments').insert({ date: TODAY, type: 'clinic', amount: 50, remaining: 50, currency: '$', offer_id: offerId, ...stamp });
 });
 
 const count = async (table: string) => Number((await t.db(table).count({ n: '*' }).first())!.n);
@@ -185,7 +185,7 @@ describe('erasing for good', () => {
     await del(staff, `/patients/${s.patientId}`);
     expect((await purge(admin, 'patient', s.patientId, ' pat patient ')).status).toBe(204); // case and spaces don't matter
 
-    for (const table of ['appointments', 'reports', 'report_tooth', 'medication_report', 'quotes', 'payments', 'appointment_category']) {
+    for (const table of ['appointments', 'reports', 'report_tooth', 'medication_report', 'treatment_offers', 'payments', 'appointment_category']) {
       expect(await count(table), table).toBe(table === 'appointments' ? 1 : 0);
     }
     expect(await t.db('patients').where({ id: s.patientId }).first()).toBeUndefined();
@@ -207,7 +207,7 @@ describe('erasing for good', () => {
     expect((await purge(admin, 'appointment', apptId, 'Pat Patient')).status).toBe(204);
     expect(await count('appointments')).toBe(0);
     expect(await count('appointment_category')).toBe(0);
-    expect(await count('quotes')).toBe(1); // the quote belongs to the patient, not the appointment
+    expect(await count('treatment_offers')).toBe(1); // the quote belongs to the patient, not the appointment
   });
 
   it('leaves a record of who erased what and how much, never the content', async () => {

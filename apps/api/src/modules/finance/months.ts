@@ -29,7 +29,7 @@ export async function monthlyTotals(db: Db, { from, to, doctorId = null }: Month
     for (const r of rows) monthly.set(r.month, { ...bucket(r.month), [field]: round2(bucket(r.month)[field] + Number(r.total)) });
   };
   await inMonths('payments as pay', 'pay.date', 'payments', (qb) => {
-    qb.leftJoin('quotes as q', 'q.id', 'pay.quote_id').leftJoin('patients as p', 'p.id', 'q.patient_id').whereNull('pay.deleted_at');
+    qb.leftJoin('treatment_offers as q', 'q.id', 'pay.offer_id').leftJoin('patients as p', 'p.id', 'q.patient_id').whereNull('pay.deleted_at');
     if (doctorId !== null) qb.where('pay.type', 'clinic').where('q.deleted_at', null).where('p.deleted_at', null).where('p.doctor_id', doctorId);
     else qb.whereRaw("(pay.type = 'commission' OR (pay.type = 'clinic' AND q.deleted_at IS NULL AND p.deleted_at IS NULL))");
   });

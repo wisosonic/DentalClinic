@@ -76,7 +76,7 @@ export function paymentsRouter(ctx: AppContext): Router {
     const base = paymentQuery(db).modify((qb) => {
       limitToScope(qb, scope);
       qb.where('pay.type', 'clinic');
-      if (q.offerId) qb.where('pay.quote_id', q.offerId);
+      if (q.offerId) qb.where('pay.offer_id', q.offerId);
       if (q.patientId) qb.where('q.patient_id', q.patientId);
       if (q.method) qb.where('pay.method', q.method);
       if (q.from) qb.where('pay.date', '>=', q.from);
@@ -125,7 +125,7 @@ export function paymentsRouter(ctx: AppContext): Router {
       const now = sqlNow();
       const [newId] = await trx('payments').insert({
         date: input.date, type: 'clinic', amount: input.amount, remaining: null, currency: offer.currency, description: input.description ?? null,
-        method: input.method, quote_id: offer.id, collected_by_doctor_id: offer.p_doctor_id ?? null,
+        method: input.method, offer_id: offer.id, collected_by_doctor_id: offer.p_doctor_id ?? null,
         dr_part: await doctorShare(trx, offer.p_doctor_id ?? null, offer.patient_id), created_by: user.id, created_at: now, updated_at: now,
       });
       await recalcOffer(trx, offer.id);
@@ -170,7 +170,7 @@ export function paymentsRouter(ctx: AppContext): Router {
       if (input.method !== undefined) update.method = input.method;
       if (input.description !== undefined) update.description = input.description;
       await trx('payments').where({ id }).update(update);
-      await recalcOffer(trx, row.quote_id);
+      await recalcOffer(trx, row.offer_id);
     });
     await audit(ctx, req, { userId: user.id, action: 'payment.update', entity: 'payment', entityId: id, diff: { fields: Object.keys(input) } });
     res.json({ payment: toPaymentDto((await paymentQuery(db).where('pay.id', id).first())!, user) });
@@ -184,7 +184,7 @@ export function paymentsRouter(ctx: AppContext): Router {
     await db.transaction(async (trx) => {
       const now = sqlNow();
       await trx('payments').where({ id }).whereNull('deleted_at').update({ deleted_at: now, deleted_by: user.id, updated_at: now });
-      await recalcOffer(trx, row.quote_id);
+      await recalcOffer(trx, row.offer_id);
     });
     await audit(ctx, req, { userId: user.id, action: 'payment.delete', entity: 'payment', entityId: id });
     res.status(204).end();

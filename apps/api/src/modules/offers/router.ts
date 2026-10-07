@@ -32,16 +32,17 @@ const listQuery = z.object({
   /** Only offers the patient still owes money on. */
   debt: z.enum(['1']).optional(),
   q: z.string().trim().max(100).optional(),
-  sort: z.enum(['patient', 'title', 'price', 'paid', 'remaining', 'status', 'created']).default('created'),
+  sort: z.enum(['patient', 'title', 'price', 'paid', 'remaining', 'status', 'progress', 'created']).default('created'),
   order: z.enum(['asc', 'desc']).default('desc'),
 });
 
 const ORDER: Record<string, string[]> = {
-  patient: ['p.lname', 'p.fname'], title: ['q.title'], price: ['q.price'], paid: ['paid'], remaining: ['remaining'], status: ['q.status'], created: ['q.created_at'],
+  patient: ['p.lname', 'p.fname'], title: ['q.title'], price: ['q.price'], paid: ['paid'], remaining: ['remaining'], status: ['q.status'], progress: ['progress_ratio', 'q.price'], created: ['q.created_at'],
 };
 
 /** When one of the offer's visits is booked it takes these from the usual booking rules. */
-const scheduleSchema = appointmentInputSchema.pick({ doctorId: true, clinicId: true, unitId: true, date: true, time: true, durationMinutes: true });
+const scheduleSchema = appointmentInputSchema.pick({ doctorId: true, clinicId: true, unitId: true, date: true, time: true, durationMinutes: true })
+  .extend({ alsoItemIds: z.array(z.number().int().positive()).max(50).optional() }); // more works done in the same visit
 
 const safeName = (s: string) => s.replace(/[^A-Za-z0-9-]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'document';
 
@@ -106,6 +107,8 @@ export function offersRouter(ctx: AppContext): Router {
     const total = Number((await filtered.clone().clearSelect().count({ n: '*' }).first())?.n ?? 0);
     const rows: Row[] = await filtered.clone()
       .select(db.raw(`(q.price - ${PAID_SQL}) as remaining`))
+      // share of the items done, for sorting the Work column (0 when there are none)
+      .select(db.raw('COALESCE((SELECT SUM(CASE WHEN w.status = ? THEN 1.0 ELSE 0 END) / COUNT(*) FROM offer_items w WHERE w.offer_id = q.id), 0) as progress_ratio', ['done']))
       .orderBy([...ORDER[q.sort]!, 'q.id'].map((column) => ({ column, order: q.order })))
       .limit(q.pageSize).offset((q.page - 1) * q.pageSize);
     const body: Paginated<OfferDto> = { data: await toOfferDtos(db, rows, user, false), meta: { page: q.page, pageSize: q.pageSize, total } };
@@ -152,7 +155,7 @@ export function offersRouter(ctx: AppContext): Router {
     await checkItems(items);
     const now = sqlNow();
     const id = await db.transaction(async (trx) => {
-      const [offerId] = await trx('quotes').insert({
+      const [offerId] = await trx('treatment_offers').insert({
         title: input.title, description: input.description ?? null, type: 'clinic', price: 0, cost: 0, currency: '$', status: input.asDraft ? 'draft' : 'accepted', patient_id: patient.id,
         doctor_id: patient.doctor_id ?? null, start_date: input.startDate ?? null, notes: input.notes ?? null, created_at: now, updated_at: now,
       });
@@ -175,7 +178,7 @@ export function offersRouter(ctx: AppContext): Router {
     const id = idParam.parse(req.params.id);
     const input = offerUpdateSchema.parse(req.body);
     notClosed(await writable(user, id));
-    await db('quotes').where({ id }).update({
+    await db('treatment_offers').where({ id }).update({
       ...(input.title !== undefined && { title: input.title }),
       ...(input.description !== undefined && { description: input.description }),
       ...(input.startDate !== undefined && { start_date: input.startDate }),
@@ -232,9 +235,11 @@ export function offersRouter(ctx: AppContext): Router {
     const body = scheduleSchema.parse(req.body);
     const offer = await load(user, id); // staff may book, a doctor only for his own patients (404 otherwise)
     if (offer.status !== 'accepted') throw new HttpError(409, 'OFFER_NOT_ACCEPTED', 'Visits can be booked once the patient has accepted the offer', { status: offer.status });
-    const item: Row | undefined = await db('offer_items').where({ id: itemId, offer_id: id }).first();
-    if (!item) throw notFound('Treatment offer item not found');
-    if (item.status !== 'pending') throw new HttpError(409, 'ITEM_NOT_PENDING', 'This item already has a visit or is done', { status: item.status });
+    const ids = [...new Set([itemId, ...(body.alsoItemIds ?? [])])];
+    const picked: Row[] = await db('offer_items').where({ offer_id: id }).whereIn('id', ids).orderBy('sequence');
+    if (picked.length !== ids.length) throw notFound('Treatment offer item not found');
+    const taken = picked.find((i) => i.status !== 'pending');
+    if (taken) throw new HttpError(409, 'ITEM_NOT_PENDING', 'This item already has a visit or is done', { status: taken.status });
     const scope = await doctorScope(db, user);
     if (scope.restricted && body.doctorId !== scope.doctorId) throw forbidden('You can only book appointments for yourself');
     if (!(await db('doctors').where({ id: body.doctorId }).first('id'))) throw badRequest('UNKNOWN_DOCTOR', 'Unknown doctor');
@@ -243,21 +248,21 @@ export function offersRouter(ctx: AppContext): Router {
     const appointmentId = await db.transaction(async (trx) => {
       await assertBookable(ctx, trx, { doctorId: body.doctorId, clinicId: body.clinicId, unitId: body.unitId, date: body.date, time: body.time, durationMinutes: body.durationMinutes });
       const [newId] = await trx('appointments').insert({
-        date: body.date, time: body.time, duration_minutes: body.durationMinutes, status: 'confirmed', intended: String(item.description).slice(0, 255),
+        date: body.date, time: body.time, duration_minutes: body.durationMinutes, status: 'confirmed', intended: picked.map((i) => String(i.description)).join(', ').slice(0, 255),
         patient_id: offer.patient_id, doctor_id: body.doctorId, clinic_id: body.clinicId, unit_id: body.unitId, created_at: now, updated_at: now,
       });
-      if (item.category_id) await trx('appointment_category').insert({ appointment_id: newId, category_id: item.category_id, created_at: now, updated_at: now });
-      if (item.tooth_id) await trx('appointment_tooth').insert({ appointment_id: newId, tooth_id: item.tooth_id, created_at: now, updated_at: now });
-      await trx('offer_items').where({ id: itemId }).update({ appointment_id: newId, status: 'scheduled', updated_at: now });
+      for (const categoryId of new Set(picked.map((i) => i.category_id).filter(Boolean))) await trx('appointment_category').insert({ appointment_id: newId, category_id: categoryId, created_at: now, updated_at: now });
+      for (const toothId of new Set(picked.map((i) => i.tooth_id).filter(Boolean))) await trx('appointment_tooth').insert({ appointment_id: newId, tooth_id: toothId, created_at: now, updated_at: now });
+      await trx('offer_items').whereIn('id', ids).update({ appointment_id: newId, status: 'scheduled', updated_at: now });
       await syncOffer(trx, id);
       return newId as number;
     });
-    await audit(ctx, req, { userId: user.id, action: 'appointment.create', entity: 'appointment', entityId: appointmentId, diff: { offerId: id, itemId, date: body.date, time: body.time } });
+    await audit(ctx, req, { userId: user.id, action: 'appointment.create', entity: 'appointment', entityId: appointmentId, diff: { offerId: id, itemIds: ids, date: body.date, time: body.time } });
     await appointmentBooked(ctx, appointmentId, user.id);
     res.status(201).json({ offer: await show(user, id), appointmentId });
   });
 
-  /** Marks an item done without a visit behind it (work finished elsewhere or recorded late). */
+  /** Marks an item done: after a visit (booked or not) or work finished elsewhere. It stays done whatever happens to the visit. */
   router.post('/:id/items/:itemId/done', requirePermission('offers:update'), async (req, res) => {
     const user = requireUser(req);
     const id = idParam.parse(req.params.id);
@@ -266,10 +271,25 @@ export function offersRouter(ctx: AppContext): Router {
     if (offer.status !== 'accepted') throw new HttpError(409, 'OFFER_NOT_ACCEPTED', 'Work can be marked done once the patient has accepted the offer', { status: offer.status });
     const item: Row | undefined = await db('offer_items').where({ id: itemId, offer_id: id }).first();
     if (!item) throw notFound('Treatment offer item not found');
-    if (item.status !== 'pending') throw new HttpError(409, 'ITEM_NOT_PENDING', 'This item already has a visit or is done', { status: item.status });
+    if (item.status === 'done') throw new HttpError(409, 'ITEM_ALREADY_DONE', 'This item is already done', { status: item.status });
     const now = sqlNow();
     await db('offer_items').where({ id: itemId }).update({ status: 'done', completed_at: now, updated_at: now });
     await audit(ctx, req, { userId: user.id, action: 'offer.item_done', entity: 'offer', entityId: id, diff: { itemId } });
+    res.json({ offer: await show(user, id) });
+  });
+
+  /** Puts a booked or finished item back to pending (done by mistake, or the visit will not cover it). Its visit, if any, stays on the calendar. */
+  router.post('/:id/items/:itemId/pending', requirePermission('offers:update'), async (req, res) => {
+    const user = requireUser(req);
+    const id = idParam.parse(req.params.id);
+    const itemId = idParam.parse(req.params.itemId);
+    const offer = await writable(user, id);
+    if (offer.status !== 'accepted') throw new HttpError(409, 'OFFER_NOT_ACCEPTED', 'Work can be changed once the patient has accepted the offer', { status: offer.status });
+    const item: Row | undefined = await db('offer_items').where({ id: itemId, offer_id: id }).first();
+    if (!item) throw notFound('Treatment offer item not found');
+    if (item.status === 'pending') throw new HttpError(409, 'ITEM_ALREADY_PENDING', 'This item is already pending', { status: item.status });
+    await db('offer_items').where({ id: itemId }).update({ status: 'pending', appointment_id: null, completed_at: null, updated_at: sqlNow() });
+    await audit(ctx, req, { userId: user.id, action: 'offer.item_pending', entity: 'offer', entityId: id, diff: { itemId } });
     res.json({ offer: await show(user, id) });
   });
 
@@ -298,7 +318,7 @@ export function offersRouter(ctx: AppContext): Router {
       throw new HttpError(409, 'WORK_STARTED', `An offer with visits booked or work done cannot be ${rule.said}`);
     }
     await db.transaction(async (trx) => {
-      const changed = await trx('quotes').where({ id }).whereIn('status', rule.from).update({ status: rule.to, updated_at: sqlNow() });
+      const changed = await trx('treatment_offers').where({ id }).whereIn('status', rule.from).update({ status: rule.to, updated_at: sqlNow() });
       if (!changed) throw new HttpError(409, 'INVALID_OFFER_TRANSITION', 'The offer was just changed by someone else');
     });
     await audit(ctx, req, { userId: user.id, action: `offer.${action.data}`, entity: 'offer', entityId: id, diff: { from: offer.status, to: rule.to } });
@@ -312,7 +332,7 @@ export function offersRouter(ctx: AppContext): Router {
     const id = idParam.parse(req.params.id);
     await writable(user, id);
     const now = sqlNow();
-    await db('quotes').where({ id }).whereNull('deleted_at').update({ deleted_at: now, deleted_by: user.id, updated_at: now });
+    await db('treatment_offers').where({ id }).whereNull('deleted_at').update({ deleted_at: now, deleted_by: user.id, updated_at: now });
     await audit(ctx, req, { userId: user.id, action: 'offer.delete', entity: 'offer', entityId: id });
     res.status(204).end();
   });

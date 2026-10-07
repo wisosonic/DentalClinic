@@ -20,7 +20,7 @@ beforeEach(async () => {
   await t.db('app_settings').del();
   await t.db('audit_log').del();
   await t.db('payments').del();
-  await t.db('quotes').del();
+  await t.db('treatment_offers').del();
   await admin.put('/settings/general', general()); // back to the server's own timezone
 });
 
@@ -116,7 +116,7 @@ describe('the clinic’s contact details on the documents', () => {
     const raw = (res.body as Buffer).toString('latin1');
     return [...raw.matchAll(/\[([^\]]*)\]\s*TJ/g)].map((arr) => [...arr[1]!.matchAll(/<([0-9a-fA-F]+)>/g)].map((m) => Buffer.from(m[1]!, 'hex').toString('latin1')).join('')).join('\n');
   };
-  const quote = async () => (await t.db('quotes').insert({ title: 'Crown', type: 'clinic', price: 100, cost: 0, currency: '$', status: 'accepted', patient_id: s.patientId, ...stamp }))[0]!;
+  const quote = async () => (await t.db('treatment_offers').insert({ title: 'Crown', type: 'clinic', price: 100, cost: 0, currency: '$', status: 'accepted', patient_id: s.patientId, ...stamp }))[0]!;
 
   it('replace the clinic record’s on the letterhead, and add the email', async () => {
     await t.db('clinics').update({ address: 'Old Road 1', phone: '111' });

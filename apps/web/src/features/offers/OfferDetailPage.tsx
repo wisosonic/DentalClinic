@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
-  Alert, Box, Button, Chip, Divider, IconButton, LinearProgress, Link, Paper, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography,
+  Alert, Box, Button, Checkbox, Chip, Divider, IconButton, LinearProgress, Link, Paper, Skeleton, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -22,7 +22,7 @@ import { PaymentFormDialog } from '../finance/PaymentFormDialog';
 import { OfferStatusChip, PaymentStateChip, WorkStateChip } from './OfferChips';
 import { ITEM_STATUS_COLOR, ITEM_STATUS_LABEL } from './labels';
 import { OfferFormDialog } from './OfferFormDialog';
-import { useDeleteOfferMutation, useGetOfferQuery, useMarkOfferItemDoneMutation, useOfferActionMutation } from './offersApi';
+import { useDeleteOfferMutation, useGetOfferQuery, useMarkOfferItemDoneMutation, useMarkOfferItemPendingMutation, useOfferActionMutation } from './offersApi';
 
 type SortKey = 'order' | 'description' | 'procedure' | 'tooth' | 'price' | 'cost' | 'status' | 'visit';
 
@@ -44,12 +44,14 @@ export function OfferDetailPage() {
   const { data: offer, isFetching, error } = useGetOfferQuery(id, { skip: !id });
   const [act, actState] = useOfferActionMutation();
   const [markDone, doneState] = useMarkOfferItemDoneMutation();
+  const [markPending, pendingState] = useMarkOfferItemPendingMutation();
+  const [picked, setPicked] = useState<number[]>([]); // pending works chosen for one visit
   const [remove, removeState] = useDeleteOfferMutation();
   const [removePayment, removePaymentState] = useDeletePaymentMutation();
   const sort = useSort<SortKey>('order');
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [booking, setBooking] = useState<OfferItemDto | null>(null);
+  const [booking, setBooking] = useState<OfferItemDto[] | null>(null);
   const [paying, setPaying] = useState<'new' | PaymentDto | null>(null);
   const [deletingPayment, setDeletingPayment] = useState<PaymentDto | null>(null);
 
@@ -60,7 +62,7 @@ export function OfferDetailPage() {
   const accepted = offer?.status === 'accepted';
   const closed = offer?.status === 'cancelled';
   const canPay = !!offer && offer.status === 'accepted' && offer.remaining > 0 && (mayWrite || role === 'staff');
-  const failure = actState.error ?? doneState.error ?? removeState.error ?? removePaymentState.error;
+  const failure = actState.error ?? doneState.error ?? pendingState.error ?? removeState.error ?? removePaymentState.error;
   const hasCost = offer?.cost !== undefined;
   const untouched = !!offer && offer.paid === 0 && (offer.items ?? []).every((i) => i.status === 'pending');
 
@@ -139,6 +141,14 @@ export function OfferDetailPage() {
       {offer.items && offer.items.length === 0 ? (
         <Paper variant="outlined" sx={{ p: 4, textAlign: 'center' }}><Typography>{t('This offer has no work listed yet.')}</Typography></Paper>
       ) : (
+        <>
+        {mayBook && accepted && picked.length > 1 && (
+          <Box sx={{ mb: 1 }}>
+            <Button variant="contained" size="small" onClick={() => { setBooking(items.filter((i) => picked.includes(i.id) && i.status === 'pending')); setPicked([]); }}>
+              {t('Book one visit for the {{count}} selected works', { count: picked.length })}
+            </Button>
+          </Box>
+        )}
         <TableContainer component={Paper} variant="outlined" sx={{ opacity: isFetching ? 0.6 : 1, mb: 3 }}>
           <Table size="small" aria-label={t('Work')}>
             <TableHead>
@@ -176,13 +186,20 @@ export function OfferDetailPage() {
                     <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
                       {accepted && i.status === 'pending' && (
                         <>
-                          <Button size="small" variant="outlined" onClick={() => setBooking(i)} aria-label={t('Book a visit for {{work}}', { work: i.description })}>{t('Book visit')}</Button>
+                          <Checkbox size="small" checked={picked.includes(i.id)} onChange={(e) => setPicked((p) => (e.target.checked ? [...p, i.id] : p.filter((x) => x !== i.id)))} inputProps={{ 'aria-label': t('Select {{work}} for one visit', { work: i.description }) }} />
+                          <Button size="small" variant="outlined" onClick={() => setBooking([i])} aria-label={t('Book a visit for {{work}}', { work: i.description })}>{t('Book visit')}</Button>
                           {mayWrite && (
                             <Button size="small" sx={{ marginInlineStart: 0.5 }} disabled={doneState.isLoading} onClick={() => { doneState.reset(); markDone({ id, itemId: i.id }); }} aria-label={t('Mark {{work}} as done', { work: i.description })}>
                               {t('Mark done')}
                             </Button>
                           )}
                         </>
+                      )}
+                      {accepted && mayWrite && i.status === 'scheduled' && (
+                        <Button size="small" disabled={doneState.isLoading} onClick={() => { doneState.reset(); markDone({ id, itemId: i.id }); }} aria-label={t('Mark {{work}} as done', { work: i.description })}>{t('Mark done')}</Button>
+                      )}
+                      {accepted && mayWrite && (i.status === 'scheduled' || i.status === 'done') && (
+                        <Button size="small" sx={{ marginInlineStart: 0.5 }} disabled={pendingState.isLoading} onClick={() => { pendingState.reset(); markPending({ id, itemId: i.id }); }} aria-label={t('Mark {{work}} as pending', { work: i.description })}>{t('Mark pending')}</Button>
                       )}
                     </TableCell>
                   )}
@@ -191,6 +208,7 @@ export function OfferDetailPage() {
             </TableBody>
           </Table>
         </TableContainer>
+        </>
       )}
 
       {seesPayments && (
@@ -242,7 +260,7 @@ export function OfferDetailPage() {
       {booking && (
         <AppointmentFormDialog
           open onClose={() => setBooking(null)} defaults={patientDefaults}
-          offerItem={{ offerId: id, itemId: booking.id, description: booking.description, categoryId: booking.category?.id ?? null }}
+          offerItem={{ offerId: id, itemId: booking[0]!.id, alsoItemIds: booking.slice(1).map((b) => b.id), description: booking.map((b) => b.description).join(', '), categoryId: booking[0]!.category?.id ?? null }}
         />
       )}
       <ConfirmDialog

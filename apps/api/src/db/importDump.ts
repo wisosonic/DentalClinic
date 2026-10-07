@@ -113,6 +113,8 @@ interface TableSpec {
   rename?: Record<string, string>;
   /** Column kinds, keyed by the NEW column name. */
   kinds?: Record<string, Kind>;
+  /** The table's name in the dump, when it differs from ours (the old app called treatment offers `quotes`). */
+  source?: string;
   /** Source columns that are not carried over. */
   drop?: string[];
   /** Columns that may be NULL after conversion. Others abort the import when unparseable. */
@@ -136,12 +138,12 @@ const IMPORT_ORDER: Record<string, TableSpec> = {
   promotions: {},
   events: {},
   event_patient: {},
-  quotes: { kinds: { cost: 'money', price: 'money' } },
-  appointments: { kinds: { date: 'date', time: 'time' } },
+  treatment_offers: { source: 'quotes', kinds: { cost: 'money', price: 'money' } },
+  appointments: { rename: { quote_id: 'offer_id' }, kinds: { date: 'date', time: 'time' } },
   appointment_category: {},
   appointment_tooth: {},
   payments: {
-    rename: { ammount: 'amount' },
+    rename: { ammount: 'amount', quote_id: 'offer_id' },
     kinds: { date: 'date', amount: 'money', remaining: 'money', dr_part: 'money' },
     nullable: ['remaining', 'dr_part'],
   },
@@ -228,7 +230,7 @@ export async function importDump(db: Db, sql: string): Promise<ImportReport> {
   const issues: string[] = [];
 
   for (const [table, spec] of Object.entries(IMPORT_ORDER)) {
-    const source = parsed[table];
+    const source = parsed[spec.source ?? table];
     if (!source) continue;
     const existing = Object.keys(await db(table).columnInfo());
     const rename = spec.rename ?? {};

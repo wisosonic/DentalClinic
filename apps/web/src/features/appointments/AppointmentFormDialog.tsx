@@ -39,7 +39,7 @@ interface Props {
   defaults?: FormDefaults;
   onSaved?: (appointment: AppointmentDto) => void;
   /** Book this item of a treatment offer: the patient, procedure and reason come from the offer. */
-  offerItem?: { offerId: number; itemId: number; description: string; categoryId: number | null };
+  offerItem?: { offerId: number; itemId: number; alsoItemIds?: number[]; description: string; categoryId: number | null };
 }
 
 type PatientOption = { id: number; fname: string; lname: string; phone?: string };
@@ -195,7 +195,7 @@ export function AppointmentFormDialog({ open, onClose, appointment, defaults, on
     if (offerItem) {
       const scheduled = await schedule({
         id: offerItem.offerId, itemId: offerItem.itemId,
-        body: { doctorId: Number(doctorId), clinicId: Number(clinicId), unitId: Number(unitId), date, time, durationMinutes: duration },
+        body: { ...(offerItem.alsoItemIds?.length && { alsoItemIds: offerItem.alsoItemIds }), doctorId: Number(doctorId), clinicId: Number(clinicId), unitId: Number(unitId), date, time, durationMinutes: duration },
       });
       if (scheduled.data) onClose();
       return;

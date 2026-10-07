@@ -30,7 +30,6 @@ The merge is built (see CLAUDE.md and section 13.2 of the plan). Left:
 
 - [ ] Look at the Treatment offers list and detail pages in the browser, in both languages and in dark mode; check the old data (70 offers with one item each) reads sensibly
 - [ ] **Before the first real deployment, back up the database:** migration 020 (treatment offers) cannot be rolled back, and it applies by itself when the API starts. (The dev database was migrated on 2026-10-06: 70 offers, $7,850 and 78 payments, $5,485, all unchanged.)
-- [ ] Optional cosmetic cleanup: rename the `quotes` table to `treatment_offers` and `payments.quote_id` to `offer_id` (and the import mapping); no behaviour changes
 
 ---
 

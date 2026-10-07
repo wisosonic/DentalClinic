@@ -45,7 +45,7 @@ export async function appointmentNoShow(ctx: AppContext, id: number, actorId: nu
 
 /** A treatment offer made (or a draft confirmed): admins, the staff (who book its visits) and the patient's primary doctor. */
 export async function offerAccepted(ctx: AppContext, offerId: number, actorId: number | null): Promise<void> {
-  const q: Row | undefined = await ctx.db('quotes as q').join('patients as p', 'p.id', 'q.patient_id').where('q.id', offerId).first('q.title', 'q.price', 'q.patient_id', 'p.fname', 'p.lname');
+  const q: Row | undefined = await ctx.db('treatment_offers as q').join('patients as p', 'p.id', 'q.patient_id').where('q.id', offerId).first('q.title', 'q.price', 'q.patient_id', 'p.fname', 'p.lname');
   if (!q) return;
   await emitEvent(ctx, {
     type: 'offer.accepted', actorId, title: 'New treatment offer',
@@ -57,7 +57,7 @@ export async function offerAccepted(ctx: AppContext, offerId: number, actorId: n
 
 /** A payment recorded: admins and the patient's primary doctor. */
 export async function paymentRecorded(ctx: AppContext, paymentId: number, actorId: number | null): Promise<void> {
-  const p: Row | undefined = await ctx.db('payments as pay').join('quotes as q', 'q.id', 'pay.quote_id').join('patients as pt', 'pt.id', 'q.patient_id').where('pay.id', paymentId)
+  const p: Row | undefined = await ctx.db('payments as pay').join('treatment_offers as q', 'q.id', 'pay.offer_id').join('patients as pt', 'pt.id', 'q.patient_id').where('pay.id', paymentId)
     .first('pay.amount', 'q.patient_id', 'q.title', 'pt.fname', 'pt.lname');
   if (!p) return;
   await emitEvent(ctx, {

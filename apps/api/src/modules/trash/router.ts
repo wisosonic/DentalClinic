@@ -25,7 +25,7 @@ const listQuery = z.object({
   order: z.enum(['asc', 'desc']).default('desc'),
 });
 
-const TABLES = { patient: 'patients', appointment: 'appointments', report: 'reports', offer: 'quotes', payment: 'payments', commission: 'payments', expense: 'expenses', lab_order: 'lab_orders', document: 'patient_documents' } as const;
+const TABLES = { patient: 'patients', appointment: 'appointments', report: 'reports', offer: 'treatment_offers', payment: 'payments', commission: 'payments', expense: 'expenses', lab_order: 'lab_orders', document: 'patient_documents' } as const;
 
 const purgeBody = z.object({ confirm: z.string().trim().max(200) });
 
@@ -51,10 +51,10 @@ export function trashRouter(ctx: AppContext): Router {
     const reports: Row[] = await db('reports as r').join('appointments as a', 'a.id', 'r.appointment_id').join('patients as p', 'p.id', 'a.patient_id')
       .leftJoin('users as u', 'u.id', 'r.deleted_by').whereNotNull('r.deleted_at')
       .select('r.id', 'a.date', 'a.time', 'r.deleted_at', 'p.fname', 'p.lname', 'a.deleted_at as appointment_deleted_at', 'u.name as by_name');
-    const offers: Row[] = await db('quotes as q').join('patients as p', 'p.id', 'q.patient_id').leftJoin('users as u', 'u.id', 'q.deleted_by')
+    const offers: Row[] = await db('treatment_offers as q').join('patients as p', 'p.id', 'q.patient_id').leftJoin('users as u', 'u.id', 'q.deleted_by')
       .whereNotNull('q.deleted_at')
       .select('q.id', 'q.title', 'q.price', 'q.deleted_at', 'p.fname', 'p.lname', 'p.deleted_at as patient_deleted_at', 'u.name as by_name');
-    const payments: Row[] = await db('payments as pay').join('quotes as q', 'q.id', 'pay.quote_id').join('patients as p', 'p.id', 'q.patient_id')
+    const payments: Row[] = await db('payments as pay').join('treatment_offers as q', 'q.id', 'pay.offer_id').join('patients as p', 'p.id', 'q.patient_id')
       .leftJoin('users as u', 'u.id', 'pay.deleted_by').whereNotNull('pay.deleted_at')
       .select('pay.id', 'pay.date', 'pay.amount', 'pay.deleted_at', 'p.fname', 'p.lname', 'q.deleted_at as offer_deleted_at', 'u.name as by_name');
     const commissions: Row[] = await db('payments as pay').leftJoin('doctors as sd', 'sd.id', 'pay.model_id').leftJoin('doctors as od', 'od.id', 'pay.collected_by_doctor_id')
@@ -126,7 +126,7 @@ export function trashRouter(ctx: AppContext): Router {
     let patientId: number;
     if (kind === 'appointment' || kind === 'offer' || kind === 'lab_order' || kind === 'document') patientId = row.patient_id;
     else if (kind === 'report') patientId = (await db('appointments').where({ id: row.appointment_id }).first('patient_id')).patient_id;
-    else patientId = (await db('quotes').where({ id: row.quote_id }).first('patient_id')).patient_id;
+    else patientId = (await db('treatment_offers').where({ id: row.offer_id }).first('patient_id')).patient_id;
     return db('patients').where({ id: patientId }).first('fname', 'lname');
   }
 
@@ -175,7 +175,7 @@ export function trashRouter(ctx: AppContext): Router {
       if (patient?.deleted_at) throw new HttpError(409, 'RESTORE_PATIENT_FIRST', 'Restore the patient first');
     }
     if (kind === 'payment') {
-      const offer = await db('quotes').where({ id: row.quote_id }).first('deleted_at');
+      const offer = await db('treatment_offers').where({ id: row.offer_id }).first('deleted_at');
       if (offer?.deleted_at) throw new HttpError(409, 'RESTORE_OFFER_FIRST', 'Restore the treatment offer first');
     }
 
@@ -184,7 +184,7 @@ export function trashRouter(ctx: AppContext): Router {
       await trx(table).where({ id }).update({ deleted_at: null, deleted_by: null, updated_at: sqlNow() });
       // A restored payment counts again, so the offer's balance is worked out afresh.
       if (kind === 'payment') {
-        await recalcOffer(trx, row.quote_id);
+        await recalcOffer(trx, row.offer_id);
       }
     });
     await audit(ctx, req, { userId: user.id, action: 'trash.restore', entity: kind, entityId: id });
@@ -208,7 +208,7 @@ export function trashRouter(ctx: AppContext): Router {
       const f = await footprint(trx, kind, id);
       const c = await countsOf(trx, f);
       if (f.documents.length) files = (await trx('patient_documents').whereIn('id', f.documents).select('file_name')).map((r: Row) => r.file_name as string);
-      const offerOfPayment = kind === 'payment' ? (await trx('payments').where({ id }).first('quote_id'))?.quote_id : null;
+      const offerOfPayment = kind === 'payment' ? (await trx('payments').where({ id }).first('offer_id'))?.offer_id : null;
       await erase(trx, f);
       if (offerOfPayment) await recalcOffer(trx, offerOfPayment);
       return c;

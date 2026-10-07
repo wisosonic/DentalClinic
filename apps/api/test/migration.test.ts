@@ -203,7 +203,7 @@ describe('migration 020: treatment plans and quotes become treatment offers', ()
     const doctor = (await conn('doctors').first('id'))!.id as number;
     const quote = async (title: string, price: number, status: string, extra: object = {}) =>
       (await conn('quotes').insert({ title, type: 'clinic', price, cost: 0, currency: '$', status, patient_id: patient, ...stamp, ...extra }))[0]!;
-    const pay = (quote_id: number, amount: number) => conn('payments').insert({ date: '2025-11-02', type: 'clinic', amount, remaining: 0, currency: '$', quote_id, dr_part: 100, ...stamp });
+    const pay = (offer_id: number, amount: number) => conn('payments').insert({ quote_id: offer_id, date: '2025-11-02', type: 'clinic', amount, remaining: 0, currency: '$', dr_part: 100, ...stamp });
     const a = await quote('Crown', 100, 'paid');
     await pay(a, 100);
     const b = await quote('Bridge', 200, 'pending');
@@ -288,11 +288,38 @@ describe('migration 020: treatment plans and quotes become treatment offers', ()
       await db('quotes').insert({ title: status, type: 'clinic', price: 10, cost: 0, currency: '$', status, patient_id: patient, ...stamp });
     }
     await db.migrate.latest(migrationConfig); // 021 and 022
-    const byTitle = async (title: string) => (await db!('quotes').where({ title }).first())!.status;
+    const byTitle = async (title: string) => (await db!('treatment_offers').where({ title }).first())!.status;
     expect([await byTitle('sent'), await byTitle('rejected'), await byTitle('expired'), await byTitle('draft'), await byTitle('accepted'), await byTitle('cancelled')])
       .toEqual(['accepted', 'cancelled', 'cancelled', 'draft', 'accepted', 'cancelled']);
-    expect(await db('quotes').where({ title: 'Bridge' }).first()).toMatchObject({ status: 'accepted' }); // the migrated pending one
+    expect(await db('treatment_offers').where({ title: 'Bridge' }).first()).toMatchObject({ status: 'accepted' }); // the migrated pending one
+    await db.migrate.down(migrationConfig); // 024 renames the columns back
+    await db.migrate.down(migrationConfig); // 023 renames the table back
     await expect(db.migrate.down(migrationConfig)).rejects.toThrow(/Rolling back migration 022 is not supported/);
+  });
+
+  it('migration 023 renames quotes to treatment_offers: keeps every row, its payments and its foreign keys, and renames back', async () => {
+    const db = await beforeOffers();
+    await db.migrate.up(migrationConfig); // 020
+    const patient = (await db('patients').first('id'))!.id as number;
+    const id = (await db('quotes').insert({ title: 'Crown', type: 'clinic', price: 100, cost: 0, currency: '$', status: 'accepted', patient_id: patient, ...stamp }))[0]!;
+    await db('payments').insert({ quote_id: id, amount: 40, currency: '$', type: 'clinic', date: '2026-10-01', ...stamp });
+    await db.migrate.latest(migrationConfig);
+    expect(await db.schema.hasTable('quotes')).toBe(false);
+    expect(await db('treatment_offers').where({ id }).first()).toMatchObject({ title: 'Crown' });
+    expect(await db('payments').where({ offer_id: id }).count({ n: '*' }).first()).toMatchObject({ n: 1 });
+    expect(await db.raw('PRAGMA foreign_key_check')).toEqual([]);
+    // payments still refuse an offer that does not exist, so the foreign key follows the new name
+    await expect(db('payments').insert({ offer_id: 999999, amount: 1, currency: '$', type: 'clinic', date: '2026-10-01', ...stamp })).rejects.toThrow();
+    const names = ((await db.raw("SELECT name FROM sqlite_master WHERE type = 'index'")) as { name: string }[]).map((r) => r.name);
+    expect(names.filter((n) => n.includes('quote'))).toEqual([]);
+    expect(names).toEqual(expect.arrayContaining(['treatment_offers_patient_id_index', 'payments_offer_id_index', 'appointments_offer_id_index']));
+    // 024 and 023 roll back, and go forward again, with the data intact
+    await db.migrate.down(migrationConfig);
+    await db.migrate.down(migrationConfig);
+    expect(await db('payments').where({ quote_id: id }).count({ n: '*' }).first()).toMatchObject({ n: 1 });
+    await db.migrate.latest(migrationConfig);
+    expect(await db('payments').where({ offer_id: id }).count({ n: '*' }).first()).toMatchObject({ n: 1 });
+    await db.destroy();
   });
 
   it('cannot be rolled back', async () => {

@@ -59,6 +59,11 @@ export const offersApi = api.injectEndpoints({
       transformResponse: (r: { offer: OfferDto }) => r.offer,
       invalidatesTags: ['Offer'],
     }),
+    markOfferItemPending: build.mutation<OfferDto, { id: number; itemId: number }>({
+      query: ({ id, itemId }) => ({ url: `/treatment-offers/${id}/items/${itemId}/pending`, method: 'POST' }),
+      transformResponse: (r: { offer: OfferDto }) => r.offer,
+      invalidatesTags: ['Offer'],
+    }),
     deleteOffer: build.mutation<void, number>({
       query: (id) => ({ url: `/treatment-offers/${id}`, method: 'DELETE' }),
       invalidatesTags: ['Offer', 'Payment', 'Trash'],
@@ -68,5 +73,5 @@ export const offersApi = api.injectEndpoints({
 
 export const {
   useListOffersQuery, useGetOfferQuery, useCreateOfferMutation, useUpdateOfferMutation, useSetOfferItemsMutation, useOfferActionMutation,
-  useScheduleOfferItemMutation, useMarkOfferItemDoneMutation, useDeleteOfferMutation,
+  useScheduleOfferItemMutation, useMarkOfferItemDoneMutation, useMarkOfferItemPendingMutation, useDeleteOfferMutation,
 } = offersApi;

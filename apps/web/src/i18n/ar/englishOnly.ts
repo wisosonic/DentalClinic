@@ -13,7 +13,6 @@ export const ENGLISH_ONLY: string[] = [
   "Search medications",
   "Choose a medication",
   "Procedures",
-  "Procedure",
   "Procedure of item {{n}}",
   "Add procedure",
   "Edit procedure",
@@ -21,7 +20,6 @@ export const ENGLISH_ONLY: string[] = [
   "Procedures and teeth",
   "Teeth",
   "Teeth involved",
-  "Tooth",
   "Tooth (optional)",
   "Tooth {{index}}",
   "Tooth {{index}}: note",
@@ -30,6 +28,4 @@ export const ENGLISH_ONLY: string[] = [
   "Prescription",
   "Dose",
   "Dose {{n}}",
-  "Treatment offers",
-  "Treatment offer",
 ];

@@ -128,6 +128,7 @@ export function OfferFormDialog({
   };
 
   const error = createState.error ?? updateState.error ?? itemsState.error;
+  const problem = Object.values(errors).some(Boolean);
   const field = (key: string) => ({ error: !!errors[key], helperText: errors[key] || undefined });
   const clear = (key: string) => setErrors((x) => ({ ...x, [key]: '' }));
 
@@ -203,6 +204,8 @@ export function OfferFormDialog({
         <TextField label={t('Notes (optional)')} value={notes} onChange={(e) => setNotes(e.target.value)} multiline minRows={2} sx={{ mt: 1 }} {...field('notes')} />
       </DialogContent>
       <DialogActions>
+        {/* the Save buttons sit below a long form: say here that something above needs fixing, since it may be out of view */}
+        {problem && <Typography role="alert" variant="body2" color="error" sx={{ flexGrow: 1, paddingInlineStart: 1 }}>{t('Something above needs fixing. Scroll up to see what.')}</Typography>}
         <Button onClick={onClose} disabled={busy}>{t('Cancel')}</Button>
         {!editing && <Button onClick={() => submit(true)} disabled={busy}>{t('Save as draft')}</Button>}
         <Button variant="contained" onClick={() => submit(false)} disabled={busy}>{busy ? t('Saving…') : editing ? t('Save changes') : t('Create offer')}</Button>

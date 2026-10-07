@@ -107,7 +107,7 @@ export async function runOfferVisitsDue(ctx: AppContext): Promise<number> {
   const { db, env } = ctx;
   if (!(await notificationSwitches(db)).events) return 0;
   const today = clinicNow(env, ctx.clock()).date;
-  const offers: Row[] = await db('quotes as q').join('patients as p', 'p.id', 'q.patient_id')
+  const offers: Row[] = await db('treatment_offers as q').join('patients as p', 'p.id', 'q.patient_id')
     .whereNull('q.deleted_at').whereNull('p.deleted_at').where('q.status', 'accepted').whereNotNull('q.start_date').where('q.start_date', '<=', today)
     .select('q.id', 'q.title', 'q.patient_id', 'p.fname', 'p.lname');
   if (!offers.length) return 0;

@@ -18,7 +18,7 @@ beforeAll(async () => {
 });
 afterAll(() => t.destroy());
 beforeEach(async () => {
-  for (const table of ['payments', 'offer_items', 'quotes', 'lab_orders', 'audit_log']) await t.db(table).del();
+  for (const table of ['payments', 'offer_items', 'treatment_offers', 'lab_orders', 'audit_log']) await t.db(table).del();
   await t.db('patients').update({ deleted_at: null, deleted_by: null });
 });
 
@@ -60,7 +60,7 @@ describe('offers and lab orders in the Trash', () => {
     expect((await purge(admin, 'offer', plan, 'Wrong Name')).body.error.code).toBe('CONFIRM_MISMATCH');
     expect((await purge(admin, 'offer', plan, 'Pat Patient')).status).toBe(204);
     expect((await purge(admin, 'lab_order', order, 'pat patient')).status).toBe(204);
-    expect(await t.db('quotes').count({ n: '*' }).first()).toMatchObject({ n: 0 });
+    expect(await t.db('treatment_offers').count({ n: '*' }).first()).toMatchObject({ n: 0 });
     expect(await t.db('offer_items').count({ n: '*' }).first()).toMatchObject({ n: 0 });
     expect(await t.db('lab_orders').count({ n: '*' }).first()).toMatchObject({ n: 0 });
     expect(JSON.stringify(await t.db('audit_log'))).not.toContain('Crown');

@@ -28,7 +28,7 @@ export function summaryRouter(ctx: AppContext): Router {
     };
 
     // Money received: payments from patients (of quotes that still exist), and commission specialists paid over.
-    const fromPatients = (await db('payments as pay').join('quotes as q', 'q.id', 'pay.quote_id').join('patients as p', 'p.id', 'q.patient_id')
+    const fromPatients = (await db('payments as pay').join('treatment_offers as q', 'q.id', 'pay.offer_id').join('patients as p', 'p.id', 'q.patient_id')
       .where('pay.type', 'clinic').whereNull('pay.deleted_at').whereNull('q.deleted_at').whereNull('p.deleted_at')
       .modify((qb) => between(qb, 'pay.date')).sum({ total: 'pay.amount' }).count({ n: '*' }).first()) as Row | undefined;
     const commission = (await db('payments as pay').where('pay.type', 'commission').whereNull('pay.deleted_at')
@@ -97,7 +97,7 @@ export function summaryRouter(ctx: AppContext): Router {
     const ids = doctors.map((d) => d.id as number);
 
     const offers: Row[] = ids.length
-      ? await db('quotes as q').join('patients as p', 'p.id', 'q.patient_id').whereNull('q.deleted_at').whereNull('p.deleted_at')
+      ? await db('treatment_offers as q').join('patients as p', 'p.id', 'q.patient_id').whereNull('q.deleted_at').whereNull('p.deleted_at')
           .whereIn('p.doctor_id', ids).whereNot('q.status', 'draft').modify((qb) => { // created_at has a time; compare the day only so the last day of the period counts
             if (from) qb.whereRaw('substr(q.created_at, 1, 10) >= ?', [from]);
             if (to) qb.whereRaw('substr(q.created_at, 1, 10) <= ?', [to]);
@@ -105,7 +105,7 @@ export function summaryRouter(ctx: AppContext): Router {
           .select('p.doctor_id').count({ n: '*' }).sum({ value: 'q.price' }).groupBy('p.doctor_id')
       : [];
     const collected: Row[] = ids.length
-      ? await db('payments as pay').join('quotes as q', 'q.id', 'pay.quote_id').join('patients as p', 'p.id', 'q.patient_id')
+      ? await db('payments as pay').join('treatment_offers as q', 'q.id', 'pay.offer_id').join('patients as p', 'p.id', 'q.patient_id')
           .where('pay.type', 'clinic').whereNull('pay.deleted_at').whereNull('q.deleted_at').whereNull('p.deleted_at')
           .whereIn('pay.collected_by_doctor_id', ids).modify((qb) => between(qb, 'pay.date'))
           .select('pay.collected_by_doctor_id as doctor_id').sum({ total: 'pay.amount' }).groupBy('pay.collected_by_doctor_id')

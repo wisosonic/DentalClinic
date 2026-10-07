@@ -16,7 +16,7 @@ export async function applyOfferDefaults(db: Conn): Promise<number> {
   const now = sqlNow();
   const withItems = new Set<number>((await db('offer_items').distinct('offer_id')).map((r: { offer_id: number }) => r.offer_id));
   let made = 0;
-  for (const q of await db('quotes').select('id', 'title', 'price', 'cost', 'status', 'created_at', 'updated_at')) {
+  for (const q of await db('treatment_offers').select('id', 'title', 'price', 'cost', 'status', 'created_at', 'updated_at')) {
     if (!withItems.has(q.id)) {
       await db('offer_items').insert({
         offer_id: q.id, description: String(q.title).slice(0, 255), price: round2(Number(q.price)), cost: q.cost == null ? null : round2(Number(q.cost)), sequence: 1,
@@ -27,7 +27,7 @@ export async function applyOfferDefaults(db: Conn): Promise<number> {
     let next = q.status as string;
     if (['paid', 'partially_paid', 'pending', 'sent'].includes(next)) next = 'accepted';
     else if (next === 'rejected' || next === 'expired') next = 'cancelled';
-    if (next !== q.status) await db('quotes').where({ id: q.id }).update({ status: next });
+    if (next !== q.status) await db('treatment_offers').where({ id: q.id }).update({ status: next });
   }
   return made;
 }

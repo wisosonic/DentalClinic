@@ -18,7 +18,7 @@ beforeAll(async () => {
 });
 afterAll(() => t.destroy());
 beforeEach(async () => {
-  for (const table of ['payments', 'quotes', 'report_tooth', 'medication_report', 'reports', 'appointment_category', 'appointment_tooth', 'appointments', 'audit_log']) await t.db(table).del();
+  for (const table of ['payments', 'treatment_offers', 'report_tooth', 'medication_report', 'reports', 'appointment_category', 'appointment_tooth', 'appointments', 'audit_log']) await t.db(table).del();
   // earlier tests' clinics are gone; only the seeded one is left to the next test
   for (const c of await t.db('clinics').whereNot({ id: s.clinicId }).select('id')) await t.db('clinics').where({ id: c.id }).del();
   await t.db('dental_units').whereNull('clinic_id').del();
@@ -39,7 +39,7 @@ describe('deleting a clinic', () => {
   it('removes the clinic record and nothing else: appointments and their dental unit stay, with no clinic', async () => {
     const { clinic, unit, appointment } = await clinicWithVisit();
     const extraUnit = (await admin.post('/units', { clinicId: clinic, ownerDoctorId: s.doctorId, name: 'Spare unit' })).body.unit.id as number; // nobody was ever booked on it
-    await t.db('quotes').insert({ title: 'Crown', type: 'clinic', price: 100, cost: 0, currency: '$', status: 'accepted', patient_id: s.patientId, ...stamp });
+    await t.db('treatment_offers').insert({ title: 'Crown', type: 'clinic', price: 100, cost: 0, currency: '$', status: 'accepted', patient_id: s.patientId, ...stamp });
     const patientsBefore = (await t.db('patients').count({ n: '*' }).first()) as { n: number };
     expect((await remove(clinic)).status).toBe(204);
 
@@ -49,7 +49,7 @@ describe('deleting a clinic', () => {
     expect(await t.db('dental_units').where({ id: extraUnit }).first()).toBeUndefined(); // a unit with nothing on it has nothing to keep
     expect(await t.db('clinic_doctor').where({ clinic_id: clinic }).count({ n: '*' }).first()).toMatchObject({ n: 0 });
     expect(await t.db('patients').count({ n: '*' }).first()).toEqual(patientsBefore);
-    expect(await t.db('quotes').count({ n: '*' }).first()).toMatchObject({ n: 1 });
+    expect(await t.db('treatment_offers').count({ n: '*' }).first()).toMatchObject({ n: 1 });
   });
 
   it('can delete a clinic that has appointments (it used to be refused), and logs only how much was kept', async () => {
@@ -64,8 +64,8 @@ describe('deleting a clinic', () => {
   it('does not touch the money: payments, quotes and the Summary and tax figures are the same afterwards', async () => {
     const { clinic, appointment } = await clinicWithVisit(TODAY);
     await t.db('appointments').where({ id: appointment }).update({ status: 'completed' });
-    const q = (await t.db('quotes').insert({ title: 'Crown', type: 'clinic', price: 500, cost: 0, currency: '$', status: 'accepted', patient_id: s.patientId, ...stamp }))[0]!;
-    await t.db('payments').insert({ date: TODAY, type: 'clinic', amount: 200, currency: '$', quote_id: q, collected_by_doctor_id: s.doctorId, dr_part: 100, ...stamp });
+    const q = (await t.db('treatment_offers').insert({ title: 'Crown', type: 'clinic', price: 500, cost: 0, currency: '$', status: 'accepted', patient_id: s.patientId, ...stamp }))[0]!;
+    await t.db('payments').insert({ date: TODAY, type: 'clinic', amount: 200, currency: '$', offer_id: q, collected_by_doctor_id: s.doctorId, dr_part: 100, ...stamp });
     const figures = async () => ({ summary: (await admin.get('/finance/summary?from=2026-01-01&to=2026-12-31')).body, tax: (await admin.get('/finance/tax?year=2026')).body.result });
     const before = await figures();
     await remove(clinic);

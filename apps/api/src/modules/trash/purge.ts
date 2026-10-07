@@ -32,7 +32,7 @@ export async function footprint(db: Conn, kind: TrashKind, id: number): Promise<
   if (kind === 'lab_order') return { ...none, labOrders: [id] };
   if (kind === 'document') return { ...none, documents: [id] };
   if (kind === 'offer') {
-    return { ...none, offers: [id], payments: ids(await db('payments').where({ quote_id: id }).select('id')) };
+    return { ...none, offers: [id], payments: ids(await db('payments').where({ offer_id: id }).select('id')) };
   }
   if (kind === 'appointment') {
     return { ...none, appointments: [id], reports: ids(await db('reports').where({ appointment_id: id }).select('id')) };
@@ -40,7 +40,7 @@ export async function footprint(db: Conn, kind: TrashKind, id: number): Promise<
   const patient = await db('patients').where({ id }).first('id', 'user_id');
   if (!patient) return none;
   const appointments = ids(await db('appointments').where({ patient_id: id }).select('id'));
-  const offers = ids(await db('quotes').where({ patient_id: id }).select('id'));
+  const offers = ids(await db('treatment_offers').where({ patient_id: id }).select('id'));
   const login = patient.user_id ? await db('users').where({ id: patient.user_id, role: 'patient' }).first('id') : null;
   return {
     ...none,
@@ -48,7 +48,7 @@ export async function footprint(db: Conn, kind: TrashKind, id: number): Promise<
     appointments,
     reports: appointments.length ? ids(await db('reports').whereIn('appointment_id', appointments).select('id')) : [],
     offers,
-    payments: offers.length ? ids(await db('payments').whereIn('quote_id', offers).select('id')) : [],
+    payments: offers.length ? ids(await db('payments').whereIn('offer_id', offers).select('id')) : [],
     labOrders: ids(await db('lab_orders').where({ patient_id: id }).select('id')),
     documents: ids(await db('patient_documents').where({ patient_id: id }).select('id')),
     userId: login?.id ?? null,
@@ -94,7 +94,7 @@ export async function erase(trx: Conn, f: Footprint): Promise<void> {
   await del('appointment_category', 'appointment_id', f.appointments);
   await del('appointment_tooth', 'appointment_id', f.appointments);
   await del('appointments', 'id', f.appointments);
-  await del('quotes', 'id', f.offers);
+  await del('treatment_offers', 'id', f.offers);
   await del('event_patient', 'patient_id', f.patients);
   await del('patients', 'id', f.patients);
   if (f.userId) {

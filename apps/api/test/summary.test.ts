@@ -14,14 +14,14 @@ beforeAll(async () => {
 afterAll(() => t.destroy());
 
 beforeEach(async () => {
-  for (const table of ['payments', 'quotes', 'expenses']) await t.db(table).del();
+  for (const table of ['payments', 'treatment_offers', 'expenses']) await t.db(table).del();
   await t.db('patients').update({ deleted_at: null });
 });
 
 const quote = async (patient_id: number, price: number, status = 'accepted') =>
-  (await t.db('quotes').insert({ title: 'Q', type: 'clinic', price, cost: 0, currency: '$', status, patient_id, ...stamp }))[0]!;
-const pay = (quote_id: number, amount: number, date: string, type = 'clinic') =>
-  t.db('payments').insert({ date, type, amount, currency: '$', quote_id: type === 'clinic' ? quote_id : null, dr_part: 100, ...stamp });
+  (await t.db('treatment_offers').insert({ title: 'Q', type: 'clinic', price, cost: 0, currency: '$', status, patient_id, ...stamp }))[0]!;
+const pay = (offer_id: number, amount: number, date: string, type = 'clinic') =>
+  t.db('payments').insert({ date, type, amount, currency: '$', offer_id: type === 'clinic' ? offer_id : null, dr_part: 100, ...stamp });
 const spend = (type: string, amount: number, date: string) => t.db('expenses').insert({ date, type, amount, currency: '$', ...stamp });
 const summary = async (qs = '') => (await admin.get(`/finance/summary${qs}`)).body;
 
@@ -75,11 +75,11 @@ describe('finance summary', () => {
   it('leaves out deleted payments, deleted expenses, and the money of deleted quotes and patients', async () => {
     const q = await quote(s.patientId, 1000);
     await pay(q, 100, '2026-10-02');
-    await t.db('payments').insert({ date: '2026-10-03', type: 'clinic', amount: 50, currency: '$', quote_id: q, dr_part: 100, deleted_at: '2026-10-04 00:00:00', ...stamp });
+    await t.db('payments').insert({ date: '2026-10-03', type: 'clinic', amount: 50, currency: '$', offer_id: q, dr_part: 100, deleted_at: '2026-10-04 00:00:00', ...stamp });
     await t.db('expenses').insert({ date: '2026-10-03', type: 'clinic', amount: 70, currency: '$', deleted_at: '2026-10-04 00:00:00', ...stamp });
     const gone = await quote(s.otherPatientId, 1000);
     await pay(gone, 400, '2026-10-02');
-    await t.db('quotes').where({ id: gone }).update({ deleted_at: '2026-10-04 00:00:00' });
+    await t.db('treatment_offers').where({ id: gone }).update({ deleted_at: '2026-10-04 00:00:00' });
     expect((await summary()).payments.total).toBe(100);
     expect((await summary()).expenses.total).toBe(0);
     await t.db('patients').where({ id: s.patientId }).update({ deleted_at: '2026-10-04 00:00:00' });
@@ -103,7 +103,7 @@ describe('finance summary', () => {
   it('applies the period to commission too, and leaves out deleted commission payments', async () => {
     await pay(0, 25, '2026-10-03', 'commission');
     await pay(0, 99, '2026-08-03', 'commission'); // outside the period
-    await t.db('payments').insert({ date: '2026-10-03', type: 'commission', amount: 500, currency: '$', quote_id: null, dr_part: 100, deleted_at: '2026-10-04 00:00:00', ...stamp });
+    await t.db('payments').insert({ date: '2026-10-03', type: 'commission', amount: 500, currency: '$', offer_id: null, dr_part: 100, deleted_at: '2026-10-04 00:00:00', ...stamp });
     const r = await summary('?from=2026-10-01&to=2026-10-31');
     expect(r.payments.byType).toEqual([{ type: 'commission', total: 25, count: 1 }]);
     expect(r.payments.total).toBe(25);

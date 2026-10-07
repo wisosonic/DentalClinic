@@ -15,15 +15,15 @@ beforeAll(async () => {
 afterAll(() => t.destroy());
 
 beforeEach(async () => {
-  for (const table of ['payments', 'quotes', 'expenses', 'appointments']) await t.db(table).del();
+  for (const table of ['payments', 'treatment_offers', 'expenses', 'appointments']) await t.db(table).del();
   await t.db('patients').update({ deleted_at: null });
   await t.db('doctors').where({ id: s.externalDoctorId }).update({ commission_percent: 30 });
 });
 
 const quote = async (patient_id: number, price: number, status = 'accepted') =>
-  (await t.db('quotes').insert({ title: 'Q', type: 'clinic', price, cost: 0, currency: '$', status, patient_id, ...stamp }))[0]!;
-const pay = (quote_id: number, amount: number, date: string, type = 'clinic') =>
-  t.db('payments').insert({ date, type, amount, currency: '$', quote_id: type === 'clinic' ? quote_id : null, dr_part: 100, ...stamp });
+  (await t.db('treatment_offers').insert({ title: 'Q', type: 'clinic', price, cost: 0, currency: '$', status, patient_id, ...stamp }))[0]!;
+const pay = (offer_id: number, amount: number, date: string, type = 'clinic') =>
+  t.db('payments').insert({ date, type, amount, currency: '$', offer_id: type === 'clinic' ? offer_id : null, dr_part: 100, ...stamp });
 const spend = (type: string, amount: number, date: string) => t.db('expenses').insert({ date, type, amount, currency: '$', ...stamp });
 const summary = async (qs = '') => (await admin.get(`/finance/summary${qs}`)).body;
 
@@ -57,7 +57,7 @@ describe('month by month', () => {
   it('is empty when there is nothing at all, and leaves out deleted money', async () => {
     expect((await summary()).byMonth).toEqual([]);
     const q = await quote(s.patientId, 100);
-    await t.db('payments').insert({ date: '2026-10-03', type: 'clinic', amount: 50, currency: '$', quote_id: q, dr_part: 100, deleted_at: '2026-10-04 00:00:00', ...stamp });
+    await t.db('payments').insert({ date: '2026-10-03', type: 'clinic', amount: 50, currency: '$', offer_id: q, dr_part: 100, deleted_at: '2026-10-04 00:00:00', ...stamp });
     await t.db('expenses').insert({ date: '2026-10-03', type: 'clinic', amount: 70, currency: '$', deleted_at: '2026-10-04 00:00:00', ...stamp });
     expect((await summary()).byMonth).toEqual([]);
   });
@@ -78,13 +78,13 @@ describe('each doctor’s figures', () => {
   async function seed() {
     const mine = await quote(s.patientId, 400, 'accepted'); // Aya's patient
     await pay(mine, 150, '2026-10-02');
-    await t.db('payments').where({ quote_id: mine }).update({ collected_by_doctor_id: s.doctorId });
+    await t.db('payments').where({ offer_id: mine }).update({ collected_by_doctor_id: s.doctorId });
     await quote(s.patientId, 100, 'draft'); // a draft is not a quote issued
     const existing = await t.db('patients').where({ patient_identifier: 'X1' }).first('id');
     const extPatient: number = existing?.id ?? (await t.db('patients').insert({ patient_identifier: 'X1', fname: 'Ext', lname: 'Pat', phone: '701', doctor_id: s.externalDoctorId, ...stamp }))[0]!;
     const theirs = await quote(extPatient, 1000, 'accepted');
     await pay(theirs, 200, '2026-10-03');
-    await t.db('payments').where({ quote_id: theirs }).update({ collected_by_doctor_id: s.externalDoctorId });
+    await t.db('payments').where({ offer_id: theirs }).update({ collected_by_doctor_id: s.externalDoctorId });
     return { extPatient };
   }
 
@@ -103,7 +103,7 @@ describe('each doctor’s figures', () => {
     expect(row(early, s.doctorId).collected).toBe(0);
     expect(row(early, s.externalDoctorId).collected).toBe(200);
     expect(row(early, s.doctorId).debts).toBe(250);
-    await t.db('quotes').update({ created_at: '2026-01-05 10:00:00' });
+    await t.db('treatment_offers').update({ created_at: '2026-01-05 10:00:00' });
     expect(row(await figures(admin, '?from=2026-10-01'), s.doctorId).offers.count).toBe(0);
     expect(row(await figures(admin, '?from=2026-01-05&to=2026-01-05'), s.doctorId).offers.count).toBe(1); // the last day counts, whatever the hour
   });

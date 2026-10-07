@@ -32,12 +32,12 @@ export function limitToScope(qb: any, scope: MoneyScope): void { // eslint-disab
 }
 
 /** The sum of an offer's payments, as a correlated sub-select (rounded to cents). */
-export const PAID_SQL = '(SELECT COALESCE(ROUND(SUM(pm.amount), 2), 0) FROM payments pm WHERE pm.quote_id = q.id AND pm.deleted_at IS NULL)';
+export const PAID_SQL = '(SELECT COALESCE(ROUND(SUM(pm.amount), 2), 0) FROM payments pm WHERE pm.offer_id = q.id AND pm.deleted_at IS NULL)';
 
 export function toPaymentDto(r: Row, user: AuthUser): PaymentDto {
   const dto: PaymentDto = {
-    id: r.id, offerId: r.quote_id ?? null,
-    offer: r.quote_id ? { id: r.quote_id, title: r.q_title } : null,
+    id: r.id, offerId: r.offer_id ?? null,
+    offer: r.offer_id ? { id: r.offer_id, title: r.q_title } : null,
     patient: r.patient_id ? { id: r.patient_id, fname: r.p_fname, lname: r.p_lname } : null,
     date: r.date, amount: round2(Number(r.amount)), remaining: r.remaining == null ? null : round2(Number(r.remaining)),
     currency: r.currency, method: (r.method as PaymentMethod | null) ?? null, description: r.description ?? null,
@@ -53,7 +53,7 @@ export function toPaymentDto(r: Row, user: AuthUser): PaymentDto {
 /** Payments joined with their offer, patient and collecting doctor; deleted ones and those of deleted offers or patients are left out. */
 export function paymentQuery(db: Db | Conn) {
   return (db as Db)('payments as pay')
-    .join('quotes as q', 'q.id', 'pay.quote_id')
+    .join('treatment_offers as q', 'q.id', 'pay.offer_id')
     .join('patients as p', 'p.id', 'q.patient_id')
     .leftJoin('doctors as d', 'd.id', 'pay.collected_by_doctor_id')
     .whereNull('pay.deleted_at')

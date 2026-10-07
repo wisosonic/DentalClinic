@@ -29,7 +29,7 @@ beforeAll(async () => {
 });
 afterAll(() => t.destroy());
 beforeEach(async () => {
-  for (const table of ['notifications', 'payments', 'offer_items', 'appointment_tooth', 'appointment_category', 'appointments', 'quotes', 'audit_log']) await t.db(table).del();
+  for (const table of ['notifications', 'payments', 'offer_items', 'appointment_tooth', 'appointment_category', 'appointments', 'treatment_offers', 'audit_log']) await t.db(table).del();
 });
 
 const items = () => [
@@ -56,7 +56,7 @@ describe('creating and reading offers', () => {
     expect(res.body.offer.items.map((i: { description: string; sequence: number }) => [i.description, i.sequence])).toEqual([['Root canal', 1], ['Crown', 2]]);
     expect(res.body.offer.items[0]).toMatchObject({ status: 'pending', appointment: null, tooth: { id: s.toothIds[0] }, price: 120, cost: 40 });
     expect((await admin.post('/treatment-offers', offer())).status).toBe(201);
-    expect(await t.db('quotes').where({ id: res.body.offer.id }).first()).toMatchObject({ price: 420.5, cost: 140.25 });
+    expect(await t.db('treatment_offers').where({ id: res.body.offer.id }).first()).toMatchObject({ price: 420.5, cost: 140.25 });
   });
 
   it('is accepted as soon as it is made (the patient agreed in the chair), and tells the staff who book its visits', async () => {
@@ -165,7 +165,10 @@ describe('creating and reading offers', () => {
     expect(await ids('sort=title&order=asc')).toEqual([a.id, b.id, draft.id]);
     expect((await ids('sort=paid&order=desc'))[0]).toBe(b.id);
     expect((await ids('sort=remaining&order=desc'))[0]).toBe(a.id);
-    for (const sort of ['patient', 'status', 'created']) expect((await aya.get(`/treatment-offers?sort=${sort}`)).status).toBe(200);
+    await aya.post(`/treatment-offers/${b.id}/items/${b.items[0].id}/done`); // Bravo is fully done, the others not started
+    expect((await ids('sort=progress&order=desc'))[0]).toBe(b.id);
+    expect((await ids('sort=progress&order=asc'))[2]).toBe(b.id);
+    for (const sort of ['patient', 'status', 'created', 'progress']) expect((await aya.get(`/treatment-offers?sort=${sort}`)).status).toBe(200);
     expect((await aya.get('/treatment-offers?sort=password')).status).toBe(400);
     expect((await aya.get('/treatment-offers?status=paid')).status).toBe(400); // paid is not a status
     expect((await aya.get('/treatment-offers?status=sent')).status).toBe(400); // nor is sent: nothing is sent online
@@ -191,7 +194,7 @@ describe('editing an offer', () => {
     expect(res.body.offer.items.map((i: { description: string; id: number }) => [i.description, i.id === b.id])).toEqual([['Crown', true], ['Whitening', false]]);
     expect(res.body.offer).toMatchObject({ price: 330, cost: 90 });
     expect(await t.db('offer_items').where({ id: a.id }).first()).toBeUndefined();
-    expect(await t.db('quotes').where({ id: o.id }).first()).toMatchObject({ price: 330 });
+    expect(await t.db('treatment_offers').where({ id: o.id }).first()).toMatchObject({ price: 330 });
     expect((await aya.put(`/treatment-offers/${o.id}/items`, { items: [{ id: 999999, description: 'x', price: 1 }] })).body.error.code).toBe('UNKNOWN_ITEM');
     expect((await aya.put(`/treatment-offers/${o.id}/items`, { items: [] })).body.offer).toMatchObject({ price: 0 }); // an offer can be emptied
   });
@@ -345,6 +348,28 @@ describe('an offer follows its visits', () => {
     const draft = await drafted();
     expect((await aya.post(`/treatment-offers/${draft.id}/items/${draft.items[0].id}/done`)).body.error.code).toBe('OFFER_NOT_ACCEPTED');
   });
+
+  it('books one visit for several works, and each can then be marked done or pending by hand', async () => {
+    const o = await accepted();
+    const [w1, w2] = [o.items[0].id, o.items[1].id];
+    const res = await aya.post(`/treatment-offers/${o.id}/items/${w1}/schedule`, slot({ alsoItemIds: [w2] }));
+    expect(res.status).toBe(201);
+    expect(res.body.offer.items.map((i: { status: string; appointment: { id: number } }) => [i.status, i.appointment.id])).toEqual([['scheduled', res.body.appointmentId], ['scheduled', res.body.appointmentId]]);
+    expect(await t.db('appointments').count({ n: '*' }).first()).toMatchObject({ n: 1 });
+    // after the visit: only the first work was done
+    const done = await aya.post(`/treatment-offers/${o.id}/items/${w1}/done`);
+    expect(done.body.offer.items.map((i: { status: string }) => i.status)).toEqual(['done', 'scheduled']);
+    // it stays done even if its visit is later cancelled; the other goes back to pending
+    await aya.post(`/appointments/${res.body.appointmentId}/cancel`, {});
+    expect((await get(o.id)).items.map((i: { status: string }) => i.status)).toEqual(['done', 'pending']);
+    const back = await aya.post(`/treatment-offers/${o.id}/items/${w1}/pending`);
+    expect(back.body.offer.items[0]).toMatchObject({ status: 'pending', appointment: null });
+    expect((await aya.post(`/treatment-offers/${o.id}/items/${w1}/pending`)).body.error.code).toBe('ITEM_ALREADY_PENDING');
+    expect((await staff.post(`/treatment-offers/${o.id}/items/${w1}/pending`)).status).toBe(403);
+    // a taken work refuses the whole visit
+    await aya.post(`/treatment-offers/${o.id}/items/${w1}/done`);
+    expect((await aya.post(`/treatment-offers/${o.id}/items/${w2}/schedule`, slot({ time: '14:00', alsoItemIds: [w1] }))).body.error.code).toBe('ITEM_NOT_PENDING');
+  });
 });
 
 describe('the offer as a PDF', () => {
@@ -377,7 +402,7 @@ describe('deleting an offer', () => {
     expect((await del(aya, `/treatment-offers/${id}`)).status).toBe(204);
     expect((await aya.get(`/treatment-offers/${id}`)).status).toBe(404);
     expect((await admin.get('/treatment-offers')).body.data).toEqual([]);
-    expect((await t.db('quotes').where({ id }).first()).deleted_at).not.toBeNull();
+    expect((await t.db('treatment_offers').where({ id }).first()).deleted_at).not.toBeNull();
     expect(await t.db('offer_items').where({ offer_id: id }).count({ n: '*' }).first()).toMatchObject({ n: 2 }); // the items stay with it
   });
 

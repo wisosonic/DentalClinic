@@ -39,7 +39,7 @@ async function computeTax(db: Db, year: number, doctorId: number | null, family:
 
   const base = () => db('payments as pay').whereNull('pay.deleted_at').whereBetween('pay.date', [from, to]);
   const own = (qb: any) => { if (doctor) qb.where('pay.collected_by_doctor_id', doctor.id); }; // eslint-disable-line @typescript-eslint/no-explicit-any -- Knex builder
-  const clinic: Row[] = await base().join('quotes as q', 'q.id', 'pay.quote_id').join('patients as p', 'p.id', 'q.patient_id')
+  const clinic: Row[] = await base().join('treatment_offers as q', 'q.id', 'pay.offer_id').join('patients as p', 'p.id', 'q.patient_id')
     .where('pay.type', 'clinic').whereNull('q.deleted_at').whereNull('p.deleted_at').modify(own)
     .select('pay.currency').sum({ total: 'pay.amount' }).count({ n: '*' }).groupBy('pay.currency');
   const commission: Row[] = await base().where('pay.type', 'commission').modify(own)

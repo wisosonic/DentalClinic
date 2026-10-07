@@ -131,7 +131,7 @@ describe('Language switch', () => {
     // The drawer is closed under jsdom, so find it by its aria-label.
     const nav = screen.getAllByRole('navigation', { hidden: true }).find((n) => n.getAttribute('aria-label') === ar.Main)!;
     const labels = within(nav).getAllByRole('link', { hidden: true }).map((l) => l.textContent);
-    expect(labels).toEqual([ar.Dashboard, ar.Appointments, ar.Patients, 'Treatment offers', ar['Lab orders'], ar.Reports, ar.Doctors, ar.Clinics, ar.Summary, ar['Income tax'], ar['By doctor'], ar.Payments, ar.Expenses, ar.Commission, 'Medications', 'Procedures', ar.Labs, ar.Suppliers, ar['Deleted clinics’ data'], ar.Users, ar.Roles, ar.Trash, ar['Activity log']]);
+    expect(labels).toEqual([ar.Dashboard, ar.Appointments, ar.Patients, ar['Treatment offers'], ar['Lab orders'], ar.Reports, ar.Doctors, ar.Clinics, ar.Summary, ar['Income tax'], ar['By doctor'], ar.Payments, ar.Expenses, ar.Commission, 'Medications', 'Procedures', ar.Labs, ar.Suppliers, ar['Deleted clinics’ data'], ar.Users, ar.Roles, ar.Trash, ar['Activity log']]);
     expect(new Intl.DateTimeFormat(i18n.language === 'ar' ? 'ar-LB-u-nu-latn' : 'en', { day: 'numeric' }).format(new Date('2026-10-05T00:00:00Z'))).toBe('5');
   });
 });

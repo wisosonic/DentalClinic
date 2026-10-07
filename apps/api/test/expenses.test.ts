@@ -31,7 +31,7 @@ beforeAll(async () => {
 afterAll(() => t.destroy());
 
 beforeEach(async () => {
-  for (const table of ['payments', 'quotes', 'expenses', 'appointments', 'audit_log']) await t.db(table).del();
+  for (const table of ['payments', 'treatment_offers', 'expenses', 'appointments', 'audit_log']) await t.db(table).del();
   await t.db('doctors').where({ id: s.externalDoctorId }).update({ commission_percent: 30 });
 });
 
@@ -165,8 +165,8 @@ describe('commission', () => {
       t.db('appointments').insert({ date, time: '10:00', status: 'completed', patient_id: extPatient, doctor_id: s.externalDoctorId, clinic_id: s.clinicId, unit_id, duration_minutes: 30, ...stamp });
     await visit('2026-09-01', s.unitId); // Aya's unit
     await visit('2026-09-20', s.saraUnitId); // Sara's unit, later
-    const quote = (await t.db('quotes').insert({ title: 'Bridge', type: 'clinic', price: 1000, cost: 0, currency: '$', status: 'accepted', patient_id: extPatient, ...stamp }))[0]!;
-    const pay = (d: string, amount: number) => t.db('payments').insert({ date: d, type: 'clinic', amount, currency: '$', quote_id: quote, collected_by_doctor_id: s.externalDoctorId, dr_part: 100, ...stamp });
+    const quote = (await t.db('treatment_offers').insert({ title: 'Bridge', type: 'clinic', price: 1000, cost: 0, currency: '$', status: 'accepted', patient_id: extPatient, ...stamp }))[0]!;
+    const pay = (d: string, amount: number) => t.db('payments').insert({ date: d, type: 'clinic', amount, currency: '$', offer_id: quote, collected_by_doctor_id: s.externalDoctorId, dr_part: 100, ...stamp });
     await pay('2026-09-10', 200); // before Sara's visit: Aya's unit
     await pay('2026-09-25', 100); // after: Sara's unit
     return quote;
@@ -201,8 +201,8 @@ describe('commission', () => {
   });
 
   it('leaves a payment with no visit to go by unassigned to any owner', async () => {
-    const quote = (await t.db('quotes').insert({ title: 'X', type: 'clinic', price: 100, cost: 0, currency: '$', status: 'accepted', patient_id: extPatient, ...stamp }))[0]!;
-    await t.db('payments').insert({ date: '2026-09-10', type: 'clinic', amount: 100, currency: '$', quote_id: quote, collected_by_doctor_id: s.externalDoctorId, dr_part: 100, ...stamp });
+    const quote = (await t.db('treatment_offers').insert({ title: 'X', type: 'clinic', price: 100, cost: 0, currency: '$', status: 'accepted', patient_id: extPatient, ...stamp }))[0]!;
+    await t.db('payments').insert({ date: '2026-09-10', type: 'clinic', amount: 100, currency: '$', offer_id: quote, collected_by_doctor_id: s.externalDoctorId, dr_part: 100, ...stamp });
     const st = await statement(admin);
     expect(st.lines).toHaveLength(1);
     expect(st.lines[0]).toMatchObject({ owner: null, collected: 100, owed: 30 });
@@ -210,8 +210,8 @@ describe('commission', () => {
 
   it('ignores the owners’ own patients, deleted payments and cancelled visits', async () => {
     await setup();
-    const q = (await t.db('quotes').insert({ title: 'Own', type: 'clinic', price: 500, cost: 0, currency: '$', status: 'accepted', patient_id: ayaPatient, ...stamp }))[0]!;
-    await t.db('payments').insert({ date: '2026-09-10', type: 'clinic', amount: 500, currency: '$', quote_id: q, collected_by_doctor_id: s.doctorId, dr_part: 100, ...stamp });
+    const q = (await t.db('treatment_offers').insert({ title: 'Own', type: 'clinic', price: 500, cost: 0, currency: '$', status: 'accepted', patient_id: ayaPatient, ...stamp }))[0]!;
+    await t.db('payments').insert({ date: '2026-09-10', type: 'clinic', amount: 500, currency: '$', offer_id: q, collected_by_doctor_id: s.doctorId, dr_part: 100, ...stamp });
     await t.db('payments').where({ amount: 100 }).update({ deleted_at: '2026-10-01 00:00:00' });
     const st = await statement(admin);
     expect(st.lines.reduce((sum: number, l: { collected: number }) => sum + l.collected, 0)).toBe(200);

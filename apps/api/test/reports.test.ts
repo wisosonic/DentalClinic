@@ -36,7 +36,7 @@ beforeAll(async () => {
 });
 afterAll(() => t.destroy());
 beforeEach(async () => {
-  for (const table of ['lab_orders', 'payments', 'quotes', 'expenses', 'appointment_category', 'appointments', 'audit_log']) await t.db(table).del();
+  for (const table of ['lab_orders', 'payments', 'treatment_offers', 'expenses', 'appointment_category', 'appointments', 'audit_log']) await t.db(table).del();
 });
 
 const fetchFile = (c: Client, url: string) => c.agent.get(`/api/v1${url}`).buffer(true).parse((res, cb) => {
@@ -58,9 +58,9 @@ const words = (res: { body: unknown }) => {
   const raw = (res.body as Buffer).toString('latin1');
   return [raw.slice(0, 8), ...[...raw.matchAll(/\[([^\]]*)\]\s*TJ/g)].map((arr) => [...arr[1]!.matchAll(/<([0-9a-fA-F]+)>/g)].map((m) => Buffer.from(m[1]!, 'hex').toString('latin1')).join(''))].join('\n');
 };
-const quote = async (patient_id: number, price: number, status = 'accepted') => (await t.db('quotes').insert({ title: 'Crown', type: 'clinic', price, cost: 0, currency: '$', status, patient_id, ...stamp }))[0]!;
-const pay = (quote_id: number, amount: number, date: string, extra: object = {}) =>
-  t.db('payments').insert({ date, type: 'clinic', amount, currency: '$', quote_id, dr_part: 100, collected_by_doctor_id: s.doctorId, ...stamp, ...extra });
+const quote = async (patient_id: number, price: number, status = 'accepted') => (await t.db('treatment_offers').insert({ title: 'Crown', type: 'clinic', price, cost: 0, currency: '$', status, patient_id, ...stamp }))[0]!;
+const pay = (offer_id: number, amount: number, date: string, extra: object = {}) =>
+  t.db('payments').insert({ date, type: 'clinic', amount, currency: '$', offer_id, dr_part: 100, collected_by_doctor_id: s.doctorId, ...stamp, ...extra });
 const visit = async (patient_id: number, doctor_id: number, date: string, time: string, status = 'confirmed') =>
   (await t.db('appointments').insert({ date, time, status, patient_id, doctor_id, clinic_id: s.clinicId, unit_id: s.unitId, duration_minutes: 30, ...stamp }))[0]!;
 

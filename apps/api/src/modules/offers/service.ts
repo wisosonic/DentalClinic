@@ -28,7 +28,7 @@ export const mayWrite = (user: AuthUser, patientDoctorId: number | null, scope: 
 
 /** Offers joined with their patient and the patient's primary doctor, with `paid` worked out; deleted offers and patients are left out. */
 export function offerQuery(db: Db | Conn) {
-  return (db as Db)('quotes as q')
+  return (db as Db)('treatment_offers as q')
     .join('patients as p', 'p.id', 'q.patient_id')
     .leftJoin('doctors as d', 'd.id', 'p.doctor_id')
     .whereNull('q.deleted_at')
@@ -101,14 +101,14 @@ export async function toOfferDtos(db: Db | Conn, rows: Row[], user: AuthUser, wi
  * The server alone works these out.
  */
 export async function recalcOffer(trx: Conn, offerId: number, opts: { fromItems?: boolean } = {}): Promise<{ price: number; paid: number; remaining: number }> {
-  const offer = await trx('quotes').where({ id: offerId }).first('id', 'price', 'cost', 'status');
+  const offer = await trx('treatment_offers').where({ id: offerId }).first('id', 'price', 'cost', 'status');
   const sums: Row | undefined = await trx('offer_items').where({ offer_id: offerId }).sum({ price: 'price' }).sum({ cost: 'cost' }).first();
   // An offer with no items keeps the price it has (only changing the items themselves may bring it to zero).
   const noItems = Number((await trx('offer_items').where({ offer_id: offerId }).count({ n: '*' }).first())?.n ?? 0) === 0;
   const keep = noItems && !opts.fromItems;
   const price = keep ? round2(Number(offer!.price)) : round2(Number(sums?.price ?? 0));
   const cost = keep ? round2(Number(offer!.cost ?? 0)) : round2(Number(sums?.cost ?? 0));
-  const payments: Row[] = await trx('payments').where({ quote_id: offerId }).whereNull('deleted_at').orderBy([{ column: 'date' }, { column: 'id' }]).select('id', 'amount', 'remaining');
+  const payments: Row[] = await trx('payments').where({ offer_id: offerId }).whereNull('deleted_at').orderBy([{ column: 'date' }, { column: 'id' }]).select('id', 'amount', 'remaining');
   let paid = 0;
   for (const p of payments) {
     paid = round2(paid + Number(p.amount));
@@ -118,7 +118,7 @@ export async function recalcOffer(trx: Conn, offerId: number, opts: { fromItems?
   const update: Record<string, unknown> = {};
   if (round2(Number(offer!.price)) !== price) update.price = price;
   if (round2(Number(offer!.cost ?? 0)) !== cost) update.cost = cost;
-  if (Object.keys(update).length) await trx('quotes').where({ id: offerId }).update({ ...update, updated_at: sqlNow() });
+  if (Object.keys(update).length) await trx('treatment_offers').where({ id: offerId }).update({ ...update, updated_at: sqlNow() });
   return { price, paid, remaining: Math.max(0, round2(price - paid)) };
 }
 
@@ -134,7 +134,7 @@ export async function syncOffer(db: Conn, offerId: number): Promise<void> {
     let status: string = item.status;
     let appointmentId: number | null = item.appointment_id;
     let completedAt: string | null = item.completed_at;
-    if (item.appointment_id) {
+    if (item.appointment_id && item.status !== 'done') { // done by hand stays done, whatever happens to the visit
       if (!item.a_status || item.a_status === 'cancelled' || item.a_status === 'no_show') {
         status = 'pending'; appointmentId = null; completedAt = null;
       } else if (item.a_status === 'completed') {
