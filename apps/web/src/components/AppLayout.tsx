@@ -16,6 +16,7 @@ import MenuIcon from '@mui/icons-material/Menu';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useGetConfigQuery } from '../features/clinical/clinicalApi';
 import { useGetMeQuery, useLogoutMutation } from '../features/auth/authApi';
 import { AppBreadcrumbs } from './AppBreadcrumbs';
 import { NotificationBell } from '../features/notifications/NotificationBell';
@@ -26,7 +27,7 @@ import { BRAND } from '../theme';
 
 const DRAWER_WIDTH = 240;
 /** Where the gear in the header leads: the sections of the settings page (not the other pages under /settings/). */
-const SETTINGS_PATHS = ['/settings/general', '/settings/appearance', '/settings/taxes', '/settings/waiting-room'];
+const SETTINGS_PATHS = ['/settings/general', '/settings/appearance', '/settings/display', '/settings/appointments', '/settings/waiting-room', '/settings/portal', '/settings/security', '/settings/uploads', '/settings/trash-and-log', '/settings/taxes'];
 
 export function AppLayout() {
   const { t } = useTranslation();
@@ -37,6 +38,7 @@ export function AppLayout() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { data: user } = useGetMeQuery();
+  const { data: config } = useGetConfigQuery();
   const [logout] = useLogoutMutation();
   const specialist = user?.role === 'doctor' && user.doctor?.kind === 'external';
 
@@ -45,7 +47,7 @@ export function AppLayout() {
       <Toolbar sx={{ minHeight: { xs: 64 }, mt: 0.5 }}>
         <BrandLogo size={30} onDark />
       </Toolbar>
-      <SideNav role={user?.role} permissions={user?.permissions} specialist={!!specialist} pathname={pathname} onNavigate={() => setOpen(false)} />
+      <SideNav role={user?.role} permissions={user?.permissions} specialist={!!specialist} pathname={pathname} onNavigate={() => setOpen(false)} portal={config?.portal} />
     </Box>
   );
 

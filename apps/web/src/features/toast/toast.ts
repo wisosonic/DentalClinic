@@ -85,6 +85,7 @@ export const TOAST_MESSAGES: Record<string, string> = {
   reopenTaxYear: 'Year reopened',
   saveGeneralSettings: 'Settings saved',
   saveAppearanceSettings: 'Settings saved',
+  saveOperatingSettings: 'Settings saved',
   saveTaxRules: 'Settings saved',
   deleteTaxRules: 'Tax rules deleted',
   createCommissionPayment: 'Commission payment recorded',

@@ -15,9 +15,9 @@ const COMMON_PASSWORDS = new Set([
 
 export const PASSWORD_MIN_LENGTH = 10;
 
-/** Returns a human-readable problem, or null when the password is acceptable. */
-export function passwordProblem(password: string, context: { email?: string } = {}): string | null {
-  if (password.length < PASSWORD_MIN_LENGTH) return `Password must be at least ${PASSWORD_MIN_LENGTH} characters`;
+/** Returns a human-readable problem, or null when the password is acceptable. `minLength` is the clinic's setting (Settings > Security). */
+export function passwordProblem(password: string, context: { email?: string } = {}, minLength: number = PASSWORD_MIN_LENGTH): string | null {
+  if (password.length < minLength) return `Password must be at least ${minLength} characters`;
   if (password.length > 128) return 'Password must be at most 128 characters';
   const lower = password.toLowerCase();
   if (COMMON_PASSWORDS.has(lower)) return 'Password is too common';
@@ -28,10 +28,15 @@ export function passwordProblem(password: string, context: { email?: string } = 
 }
 
 
-export const passwordSchema = z.string().superRefine((value, ctx) => {
-  const problem = passwordProblem(value);
+/** A password field with the clinic's minimum length (the server checks it again with the saved setting). */
+export const makePasswordSchema = (minLength: number = PASSWORD_MIN_LENGTH) => z.string().superRefine((value, ctx) => {
+  const problem = passwordProblem(value, {}, minLength);
   if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, message: problem });
 });
+export const passwordSchema = makePasswordSchema();
+
+/** What the server accepts as a new password before it checks it against the saved rules (`passwordProblem`). */
+export const newPasswordInputSchema = z.string().min(1).max(128);
 
 /** What a person types to sign in: their email, or the username of a patient login. */
 export const loginNameSchema = z.string().trim().toLowerCase().min(1).max(255);
@@ -54,13 +59,13 @@ export type LoginInput = z.infer<typeof loginSchema>;
 
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(128),
-  newPassword: passwordSchema,
+  newPassword: newPasswordInputSchema,
 });
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
 export const resetPasswordSchema = z.object({
   token: z.string().min(20).max(200),
-  password: passwordSchema,
+  password: newPasswordInputSchema,
 });
 
 export interface PublicUser {
@@ -99,6 +104,7 @@ export * from './offers';
 export * from './documents';
 export * from './portal';
 export * from './waiting';
+export * from './operating';
 export * from './tax';
 export * from './settings';
 export * from './roles';

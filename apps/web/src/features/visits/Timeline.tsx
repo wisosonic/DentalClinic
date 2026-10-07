@@ -5,6 +5,7 @@ import type { TimelineEntryDto } from '@aya/shared';
 import { StatusChip } from '../../components/StatusChip';
 import { formatDate, fullName } from '../../lib/format';
 import { ReportView } from './ReportView';
+import { TimeText } from '../../lib/useTime';
 
 interface Props {
   entries: TimelineEntryDto[];
@@ -48,7 +49,7 @@ export function Timeline({ entries, onOpenAppointment, emptyText = 'No appointme
                 <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                   <Typography fontWeight={600}>{formatDate(a.date)}</Typography>
                   <Typography variant="body2" color="text.secondary">
-                    <bdi dir="ltr">{a.time}–{a.endTime}</bdi> · {t('Dr {{name}}', { name: fullName(a.doctor) })}
+                    <TimeText value={a.time} end={a.endTime} /> · {t('Dr {{name}}', { name: fullName(a.doctor) })}
                   </Typography>
                 </Box>
                 <StatusChip status={a.status} />

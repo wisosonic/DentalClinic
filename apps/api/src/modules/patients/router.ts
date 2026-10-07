@@ -6,6 +6,7 @@ import { hashPassword } from '../../lib/password';
 import { generatePassword } from '../../lib/crypto';
 import { patientLoginEmail, uniqueUsername, usernameBase } from '../../lib/username';
 import { limiter } from '../../middleware/rateLimit';
+import { assertPortalOn } from '../settings/operating';
 import { clinicLetterhead } from '../finance/letterhead';
 import { revokeAllForUser } from '../auth/session';
 import { renderPatientCard } from './card';
@@ -106,6 +107,7 @@ export function patientsRouter(ctx: AppContext): Router {
 
   // A patient's own record (the linked account), before /:id.
   router.get('/me', requireRole('patient'), async (req, res) => {
+    await assertPortalOn(ctx);
     const user = requireUser(req);
     const row = await db('patients').where({ user_id: user.id }).whereNull('deleted_at').first();
     if (!row) throw notFound('No patient record is linked to this account');
@@ -114,6 +116,7 @@ export function patientsRouter(ctx: AppContext): Router {
 
   // A patient's own appointment history with their reports (summary and prescriptions only).
   router.get('/me/timeline', requireRole('patient'), async (req, res) => {
+    await assertPortalOn(ctx);
     const user = requireUser(req);
     const row = await db('patients').where({ user_id: user.id }).whereNull('deleted_at').first();
     if (!row) throw notFound('No patient record is linked to this account');

@@ -18,7 +18,7 @@ export function PortalHome() {
   if (isLoading) return <Skeleton variant="rounded" height={160} aria-label={t('Loading')} />;
   if (error || !data) return <Paper sx={{ p: 3, maxWidth: 560 }}><Typography color="error">{errorMessage(error)}</Typography></Paper>;
   const { balance } = data;
-  const paidPercent = balance.price > 0 ? Math.min(100, Math.round((balance.paid / balance.price) * 100)) : 0;
+  const paidPercent = balance && balance.price > 0 ? Math.min(100, Math.round((balance.paid / balance.price) * 100)) : 0;
 
   const tile = (to: string, icon: React.ReactNode, label: string, note?: string) => (
     <Paper component={RouterLink} to={to} sx={{ p: 2, textDecoration: 'none', color: 'inherit', display: 'flex', alignItems: 'center', gap: 1.5, minHeight: 64, '&:hover': { boxShadow: 6 } }}>
@@ -46,6 +46,7 @@ export function PortalHome() {
         )}
       </Box>
 
+      {balance && (
       <Box component="section" aria-label={t('Your treatment balance')}>
         <Typography variant="h6" component="h2" sx={{ mb: 1 }}>{t('Your treatment balance')}</Typography>
         <Paper sx={{ p: 2.5 }}>
@@ -64,11 +65,12 @@ export function PortalHome() {
           <Button component={RouterLink} to="/my/treatment" sx={{ mt: 1.5 }}>{t('See my treatment')}</Button>
         </Paper>
       </Box>
+      )}
 
       <Box component="nav" aria-label={t('My care')} sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 2 }}>
         {tile('/my/appointments', <EventNoteIcon />, t('My appointments'), t('Upcoming visits and your visit history'))}
         {tile('/my/treatment', <AssignmentIcon />, t('My treatment'), t('What is planned, and how far it has got'))}
-        {tile('/my/payments', <PaymentsIcon />, t('My payments'), t('Payments and receipts'))}
+        {data.showPayments && tile('/my/payments', <PaymentsIcon />, t('My payments'), t('Payments and receipts'))}
         {tile('/my/documents', <FolderIcon />, t('My documents'), data.documentsCount > 0 ? t('{{n}} shared with you', { n: data.documentsCount }) : t('Nothing shared with you yet'))}
       </Box>
     </Stack>

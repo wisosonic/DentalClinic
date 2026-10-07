@@ -43,7 +43,7 @@ const SECTIONS: Record<string, string> = {
 const PATIENT_LISTS = ['/payments', '/treatment-offers', '/lab-orders'];
 
 /** The sections of the settings page, by path. */
-const SETTINGS_SECTION_LABEL: Record<string, string> = { '/settings/general': 'General', '/settings/appearance': 'Appearance', '/settings/taxes': 'Taxes', '/settings/waiting-room': 'Waiting room' };
+const SETTINGS_SECTION_LABEL: Record<string, string> = { '/settings/general': 'General', '/settings/appearance': 'Appearance', '/settings/taxes': 'Taxes', '/settings/waiting-room': 'Waiting room', '/settings/display': 'Date and time', '/settings/appointments': 'Appointments', '/settings/portal': 'Patient portal', '/settings/security': 'Security', '/settings/uploads': 'Uploads', '/settings/trash-and-log': 'Trash and activity log' };
 
 /**
  * Where you are, with a link back to each level: Dashboard > Section > (a patient's name).

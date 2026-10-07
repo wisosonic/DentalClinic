@@ -1,14 +1,32 @@
 import { useState } from 'react';
-import { Alert, Box, Button, Paper, TextField, Typography } from '@mui/material';
+import { Alert, Box, Button, Paper, Stack, TextField, Typography } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { errorMessage } from '../../lib/baseQuery';
+import { OperatingForm } from '../settings/OperatingSections';
 import { useGetWaitingScreenQuery, useResetWaitingScreenMutation } from './waitingApi';
 
 /** Settings > Waiting room: the address to open on the screen in the waiting room. */
 export function WaitingScreenSection() {
+  const { t } = useTranslation();
+  return (
+    <Stack spacing={3}>
+      <OperatingForm
+        group="waiting" title={t('Waiting room')} intro={t('How the numbers and the waiting-room screen behave.')}
+        fields={[
+          { key: 'chime', kind: 'switch', label: t('Offer a chime on the screen'), help: t('The screen shows a sound button; browsers need one click on it before they play any sound.') },
+          { key: 'unitLetters', kind: 'switch', label: t('Write the dental unit’s letter before the number'), help: t('12 becomes A12 for the first dental unit, B12 for the second. Only the way it is written changes: the numbers still run in the order people arrive.') },
+          { key: 'finishedCallSeconds', kind: 'number', label: t('A finished call stays on the screen for'), unit: t('seconds'), help: t('0 takes it off as soon as the doctor finishes with the patient.') },
+        ]}
+      />
+      <WaitingScreenAddress />
+    </Stack>
+  );
+}
+
+function WaitingScreenAddress() {
   const { t } = useTranslation();
   const { data, error } = useGetWaitingScreenQuery();
   const [make, state] = useResetWaitingScreenMutation();

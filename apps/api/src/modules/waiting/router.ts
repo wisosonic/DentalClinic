@@ -5,7 +5,7 @@ import {
   type WaitingAction, type WaitingCandidateDto, type WaitingDisplayDto, type WaitingListDto, type WaitingScreenDto, type WaitingStatus, type WaitingTicketDto,
 } from '@aya/shared';
 import type { AppContext } from '../../context';
-import { sqlNow } from '../../db/connection';
+import { sqlFuture, sqlNow } from '../../db/connection';
 import { randomToken, safeEqual } from '../../lib/crypto';
 import { isUniqueError } from '../../lib/dbErrors';
 import { HttpError, badRequest, notFound } from '../../lib/errors';
@@ -14,12 +14,40 @@ import { limiter } from '../../middleware/rateLimit';
 import { requireAuth, requirePermission, requireUser, type AuthUser } from '../../middleware/auth';
 import { audit } from '../audit/audit';
 import { doctorIdFor } from '../visits/access';
+import { operating } from '../settings/operating';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any -- DB row
 
 const idParam = z.coerce.number().int().positive();
 const SCREEN_KEY = 'waiting.display_key';
 const ACTIVE: WaitingStatus[] = ['waiting', 'called'];
+
+/** A, B, ... Z, AA, AB...: the letter of the nth dental unit. */
+const letterOf = (n: number): string => {
+  let s = '';
+  let i = n;
+  do {
+    s = String.fromCharCode(65 + (i % 26)) + s;
+    i = Math.floor(i / 26) - 1;
+  } while (i >= 0);
+  return s;
+};
+
+/** The letter of each dental unit (its place among its clinic's units, oldest first), when the clinic shows letters before numbers. */
+async function unitLettersFor(ctx: AppContext, on: boolean): Promise<Map<number, string> | null> {
+  if (!on) return null;
+  const units: Row[] = await ctx.db('dental_units').whereNotNull('clinic_id').orderBy([{ column: 'clinic_id' }, { column: 'id' }]).select('id', 'clinic_id');
+  const next = new Map<number, number>();
+  const out = new Map<number, string>();
+  for (const u of units) {
+    const n = next.get(u.clinic_id) ?? 0;
+    next.set(u.clinic_id, n + 1);
+    out.set(u.id, letterOf(n));
+  }
+  return out;
+}
+const labelOf = (letters: Map<number, string> | null, unitId: number | null, number: number): string =>
+  letters && unitId && letters.get(unitId) ? letters.get(unitId) + String(number) : String(number);
 
 /** Which statuses each action starts from, and where it ends. */
 const RULES: Record<WaitingAction, { from: WaitingStatus[]; to: WaitingStatus }> = {
@@ -60,12 +88,13 @@ export function waitingRouter(ctx: AppContext): Router {
       .select('w.*', 'p.fname as p_fname', 'p.lname as p_lname', 'd.fname as d_fname', 'd.lname as d_lname', 'u.name as u_name', 'a.time as a_time', 'a.intended as a_intended');
 
   async function toDtos(rows: Row[]): Promise<WaitingTicketDto[]> {
+    const letters = await unitLettersFor(ctx, (await operating(ctx)).waiting.unitLetters);
     const ids = rows.map((r) => r.appointment_id).filter(Boolean);
     const categories: Row[] = ids.length
       ? await db('appointment_category as ac').join('categories as c', 'c.id', 'ac.category_id').whereIn('ac.appointment_id', ids).select('ac.appointment_id', 'c.name').orderBy('c.name')
       : [];
     return rows.map((r) => ({
-      id: r.id, number: r.number, date: r.date, status: r.status as WaitingStatus,
+      id: r.id, number: r.number, label: labelOf(letters, r.unit_id, r.number), date: r.date, status: r.status as WaitingStatus,
       patient: { id: r.patient_id, fname: r.p_fname, lname: r.p_lname },
       doctor: { id: r.doctor_id, fname: r.d_fname, lname: r.d_lname },
       unit: r.unit_id ? { id: r.unit_id, name: r.u_name } : null,
@@ -223,17 +252,26 @@ export function waitingDisplayRouter(ctx: AppContext): Router {
     const stored: Row | undefined = await db('app_settings').where({ key: SCREEN_KEY }).first('value');
     if (!stored || !given || !safeEqual(given, stored.value)) throw notFound('Not found'); // a wrong address looks like no page
     const date = clinicNow(env, ctx.clock()).date;
+    const set = (await operating(ctx)).waiting;
+    // Called now; and, when the clinic wants it, a call the doctor has just finished with stays up for a few seconds.
+    const keepSince = sqlFuture(-set.finishedCallSeconds * 1000);
     const called: Row[] = await db('waiting_tickets as w').join('patients as p', 'p.id', 'w.patient_id').leftJoin('dental_units as u', 'u.id', 'w.unit_id')
-      .whereNull('p.deleted_at').where({ 'w.date': date, 'w.status': 'called' }).select('w.number', 'w.called_at', 'w.call_count', 'u.id as unit_id', 'u.name as unit')
+      .whereNull('p.deleted_at').where('w.date', date)
+      .where((qb) => {
+        qb.where('w.status', 'called');
+        if (set.finishedCallSeconds > 0) qb.orWhere((q2) => q2.where('w.status', 'done').whereNotNull('w.called_at').where('w.finished_at', '>=', keepSince));
+      })
+      .select('w.number', 'w.called_at', 'w.call_count', 'u.id as unit_id', 'u.name as unit')
       .orderBy([{ column: 'w.called_at', order: 'desc' }, { column: 'w.id', order: 'desc' }]);
     // One entry per dental unit: the most recent call there.
     const seen = new Set<number | null>();
     const calls = called.filter((c) => { const k = c.unit_id ?? null; if (k !== null && seen.has(k)) return false; seen.add(k); return true; });
     const waiting = Number((await db('waiting_tickets as w').join('patients as p', 'p.id', 'w.patient_id').whereNull('p.deleted_at').where({ 'w.date': date, 'w.status': 'waiting' }).count({ n: '*' }).first())?.n ?? 0);
     const clinic: Row | undefined = await db('clinics').orderBy('id').first('name');
+    const letters = await unitLettersFor(ctx, set.unitLetters);
     const body: WaitingDisplayDto = {
-      calls: calls.map((c) => ({ number: c.number, unit: c.unit ?? null, calledAt: c.called_at, callCount: c.call_count })),
-      waiting, clinic: clinic?.name ?? null,
+      calls: calls.map((c) => ({ number: c.number, label: labelOf(letters, c.unit_id, c.number), unit: c.unit ?? null, calledAt: c.called_at, callCount: c.call_count })),
+      waiting, clinic: clinic?.name ?? null, chime: set.chime,
     };
     res.set('Cache-Control', 'no-store').json(body);
   });

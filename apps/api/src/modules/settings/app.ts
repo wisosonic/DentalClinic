@@ -8,6 +8,7 @@ import type { Db } from '../../db/connection';
 import { sqlNow } from '../../db/connection';
 import { requireAuth, requirePermission, requireRole, requireUser } from '../../middleware/auth';
 import { audit } from '../audit/audit';
+import { loadOperating } from './operating';
 
 const KEYS = {
   language: 'general.language',
@@ -21,12 +22,12 @@ const KEYS = {
   eventsOn: 'notify.events',
 } as const;
 
-async function readAll(db: Db): Promise<Map<string, string>> {
+export async function readAll(db: Db): Promise<Map<string, string>> {
   const rows: { key: string; value: string }[] = await db('app_settings').select('key', 'value');
   return new Map(rows.map((r) => [r.key, r.value]));
 }
 
-async function save(db: Db, userId: number, values: Record<string, string | null>): Promise<void> {
+export async function save(db: Db, userId: number, values: Record<string, string | null>): Promise<void> {
   const now = sqlNow();
   await db.transaction(async (trx) => {
     for (const [key, value] of Object.entries(values)) {
@@ -91,7 +92,7 @@ export function publicSettingsRouter(ctx: AppContext): Router {
   const router = Router();
   router.get('/public-settings', async (_req, res) => {
     const [general, appearance] = [await loadGeneral(ctx), await loadAppearance(ctx.db)];
-    const body: PublicSettingsDto = { language: general.language, mode: appearance.mode, textSize: appearance.textSize };
+    const body: PublicSettingsDto = { language: general.language, mode: appearance.mode, textSize: appearance.textSize, passwordMinLength: (await loadOperating(ctx.db, ctx.env)).security.passwordMinLength };
     res.json(body);
   });
   return router;

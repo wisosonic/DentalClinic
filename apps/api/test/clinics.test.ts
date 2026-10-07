@@ -293,6 +293,8 @@ describe('reference data and configuration', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
       defaultDuration: 30, durationStep: 15, minDuration: 15, maxDuration: 480, cancelMinHours: 24, timezone: 'Asia/Beirut', today: '2026-10-05',
+      weekStart: 'monday', timeFormat: '24h', passwordMinLength: 10,
+      documents: { maxMb: 25, maxPerPatient: 200, visibleByDefault: false }, portal: { enabled: true, showPayments: true },
     });
     expect(res.body).not.toHaveProperty('workingDays');
     expect((await t.client().get('/config')).status).toBe(401);

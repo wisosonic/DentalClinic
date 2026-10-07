@@ -13,6 +13,7 @@ import { formatDate, fullName, statusLabel } from '../../lib/format';
 import { useDebounce } from '../../lib/useDebounce';
 import { SortCell, useSort } from '../../components/SortHead';
 import { useGetDoctorsQuery, useGetUnitsQuery, useListAppointmentsQuery } from '../clinical/clinicalApi';
+import { TimeText } from '../../lib/useTime';
 
 export function AppointmentList({ onSelect }: { onSelect: (id: number) => void }) {
   const { t } = useTranslation();
@@ -82,7 +83,7 @@ export function AppointmentList({ onSelect }: { onSelect: (id: number) => void }
                     </Box>
                   </Box>
                   <Typography variant="body2" color="text.secondary">
-                    {formatDate(a.date)} · <bdi dir="ltr">{a.time}–{a.endTime}</bdi> · {t('Dr {{name}}', { name: `${a.doctor.fname} ${a.doctor.lname}` })}
+                    {formatDate(a.date)} · <TimeText value={a.time} end={a.endTime} /> · {t('Dr {{name}}', { name: `${a.doctor.fname} ${a.doctor.lname}` })}
                   </Typography>
                 </CardContent>
               </CardActionArea>
@@ -107,7 +108,7 @@ export function AppointmentList({ onSelect }: { onSelect: (id: number) => void }
                   onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onSelect(a.id)}
                 >
                   <TableCell>{formatDate(a.date)}</TableCell>
-                  <TableCell><bdi dir="ltr">{a.time}–{a.endTime}</bdi></TableCell>
+                  <TableCell><TimeText value={a.time} end={a.endTime} /></TableCell>
                   <TableCell>{fullName(a.patient)}</TableCell>
                   <TableCell>{fullName(a.doctor)}</TableCell>
                   <TableCell>{a.unit?.name ?? '—'}</TableCell>

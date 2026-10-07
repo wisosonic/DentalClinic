@@ -11,6 +11,7 @@ import { doctorScope } from '../../lib/scope';
 import { whereWords } from '../../lib/search';
 import { requireAuth, requirePermission, requireRole, requireUser, type AuthUser } from '../../middleware/auth';
 import { audit, auditView } from '../audit/audit';
+import { operating } from '../settings/operating';
 import { assertBookable } from '../appointments/service';
 import { PAID_SQL, limitToScope, round2, type MoneyScope } from '../finance/service';
 import { clinicLetterhead } from '../finance/letterhead';
@@ -231,7 +232,8 @@ export function offersRouter(ctx: AppContext): Router {
     const user = requireUser(req);
     const id = idParam.parse(req.params.id);
     const itemId = idParam.parse(req.params.itemId);
-    const body = scheduleSchema.parse(req.body);
+    const parsedSlot = scheduleSchema.parse(req.body);
+    const body = { ...parsedSlot, durationMinutes: parsedSlot.durationMinutes ?? (await operating(ctx)).appointments.defaultDuration };
     const offer = await load(user, id); // staff may book, a doctor only for his own patients (404 otherwise)
     if (offer.status !== 'accepted') throw new HttpError(409, 'OFFER_NOT_ACCEPTED', 'Visits can be booked once the patient has accepted the offer', { status: offer.status });
     const ids = [...new Set([itemId, ...(body.alsoItemIds ?? [])])];

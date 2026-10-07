@@ -3,6 +3,7 @@ import type { AppContext } from '../context';
 import { clinicNow, toMinutes } from '../lib/time';
 import { adminUserIds, doctorUserIds, notify, patientUserIds, staffUserIds } from '../modules/notifications/service';
 import { notificationSwitches } from '../modules/settings/app';
+import { operating } from '../modules/settings/operating';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any -- DB row
 
@@ -17,10 +18,6 @@ const addDays = (date: string, days: number): string => {
 const minutesUntil = (now: { date: string; minutes: number }, date: string, time: string): number =>
   Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${now.date}T00:00:00Z`)) / 60000) + toMinutes(time) - now.minutes;
 
-/** How long before an appointment its reminder goes out. */
-export const REMINDER_MINUTES = 120;
-/** The patient's own reminder goes out a day ahead (an assumption to confirm with the owner), so they can cancel in time. */
-export const PATIENT_REMINDER_MINUTES = 24 * 60;
 
 /**
  * Reminds the appointment's doctor and the staff of every confirmed appointment that starts within the next two
@@ -30,9 +27,14 @@ export const PATIENT_REMINDER_MINUTES = 24 * 60;
 export async function runReminders(ctx: AppContext): Promise<number> {
   const { db, env } = ctx;
   if (!(await notificationSwitches(db)).reminders) return 0;
+  // How far ahead each reminder goes out is the clinic's choice (Settings > Appointments).
+  const lead = (await operating(ctx)).appointments;
+  const REMINDER_MINUTES = lead.staffReminderMinutes;
+  const PATIENT_REMINDER_MINUTES = lead.patientReminderHours * 60;
   const now = clinicNow(env, ctx.clock());
+  const lookAheadDays = Math.ceil(Math.max(REMINDER_MINUTES, PATIENT_REMINDER_MINUTES) / 1440) + 1;
   const rows: Row[] = await db('appointments as a').join('patients as p', 'p.id', 'a.patient_id').join('doctors as d', 'd.id', 'a.doctor_id')
-    .whereNull('a.deleted_at').whereNull('p.deleted_at').where('a.status', 'confirmed').whereBetween('a.date', [now.date, addDays(now.date, 1)])
+    .whereNull('a.deleted_at').whereNull('p.deleted_at').where('a.status', 'confirmed').whereBetween('a.date', [now.date, addDays(now.date, lookAheadDays)])
     .select('a.id', 'a.date', 'a.time', 'a.doctor_id', 'a.patient_id', 'p.fname', 'p.lname', 'd.fname as d_fname', 'd.lname as d_lname');
   const staff = await staffUserIds(db);
   let told = 0;
@@ -41,14 +43,14 @@ export async function runReminders(ctx: AppContext): Promise<number> {
     if (left > 0 && left <= PATIENT_REMINDER_MINUTES) {
       told += await notify(ctx, {
         userIds: await patientUserIds(db, a.patient_id), type: 'appointment.reminder', title: 'Appointment reminder',
-        content: `You have an appointment with Dr ${a.d_fname} ${a.d_lname} ${a.date === now.date ? 'today' : 'tomorrow'} at ${a.time}. To cancel it online, do it at least ${env.CANCEL_MIN_HOURS} hours ahead.`,
+        content: `You have an appointment with Dr ${a.d_fname} ${a.d_lname} ${a.date === now.date ? 'today' : a.date === addDays(now.date, 1) ? 'tomorrow' : `on ${a.date}`} at ${a.time}. To cancel it online, do it at least ${lead.cancelMinHours} hours ahead.`,
         link: '/my/appointments', appointmentId: a.id, dedupeKey: `appt:${a.id}:patient:${a.date}T${a.time}`,
       });
     }
     if (left <= 0 || left > REMINDER_MINUTES) continue;
     told += await notify(ctx, {
       userIds: [...(await doctorUserIds(db, a.doctor_id)), ...staff], type: 'appointment.reminder',
-      title: `Appointment at ${a.time}`, content: `${a.fname} ${a.lname} with Dr ${a.d_fname} ${a.d_lname} at ${a.time} today.`.replace('today', a.date === now.date ? 'today' : 'tomorrow'),
+      title: `Appointment at ${a.time}`, content: `${a.fname} ${a.lname} with Dr ${a.d_fname} ${a.d_lname} at ${a.time} today.`.replace('today', a.date === now.date ? 'today' : a.date === addDays(now.date, 1) ? 'tomorrow' : `on ${a.date}`),
       link: '/appointments', appointmentId: a.id, dedupeKey: `appt:${a.id}:2h:${a.date}T${a.time}`,
     });
   }

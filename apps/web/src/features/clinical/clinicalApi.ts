@@ -84,7 +84,7 @@ type Body = Record<string, unknown>;
 export const clinicalApi = api.injectEndpoints({
   endpoints: (build) => ({
     // ----- reference ---------------------------------------------------------
-    getConfig: build.query<ClinicConfigDto, void>({ query: () => '/config' }),
+    getConfig: build.query<ClinicConfigDto, void>({ query: () => '/config', providesTags: ['Settings'] }), // the settings pages change it
     getTeeth: build.query<ToothDto[], void>({ query: () => '/teeth', transformResponse: (r: { data: ToothDto[] }) => r.data }),
     getCategories: build.query<CategoryDto[], void>({
       query: () => '/categories',

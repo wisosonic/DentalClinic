@@ -222,7 +222,8 @@ export const appointmentInputSchema = z.object({
   unitId: idSchema,
   date: dateSchema,
   time: timeSchema,
-  durationMinutes: durationSchema.default(DEFAULT_DURATION),
+  /** Left out, the clinic's default length (Settings > Appointments) is used. */
+  durationMinutes: durationSchema.optional(),
   intended: optionalText(2000),
   categoryIds: z.array(idSchema).max(20).optional(),
   toothIds: z.array(idSchema).max(32).optional(),
@@ -325,6 +326,15 @@ export interface ClinicConfigDto {
   timezone: string;
   /** Today's date at the clinic, 'YYYY-MM-DD'. */
   today: string;
+  /** How dates and times are shown (Settings > Date and time). */
+  weekStart: 'monday' | 'sunday' | 'saturday';
+  timeFormat: '24h' | '12h';
+  /** The shortest password the clinic accepts (Settings > Security). */
+  passwordMinLength: number;
+  /** Document limits and defaults (Settings > Uploads and Patient portal). */
+  documents: { maxMb: number; maxPerPatient: number; visibleByDefault: boolean };
+  /** The patient portal (Settings > Patient portal). */
+  portal: { enabled: boolean; showPayments: boolean };
 }
 
 /** One line of the activity log (admin only). Only ids and field names are ever stored, never record content. */

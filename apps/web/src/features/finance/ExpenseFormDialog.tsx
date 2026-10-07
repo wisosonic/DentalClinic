@@ -11,10 +11,12 @@ import { useGetConfigQuery, useGetDoctorsQuery } from '../clinical/clinicalApi';
 import {
   useCommissionAppointmentsQuery, useCreateExpenseMutation, useLabsQuery, useSuppliersQuery, useUpdateExpenseMutation,
 } from './financeApi';
+import { useTimeFormat } from '../../lib/useTime';
 
 /** One expense. What else must be filled in depends on its type: a lab, a supplier, or a specialist (and, optionally, the visit). */
 export function ExpenseFormDialog({ open, onClose, expense }: { open: boolean; onClose: () => void; expense?: ExpenseDto }) {
   const { t } = useTranslation();
+  const fmtTime = useTimeFormat();
   const { isAdmin } = useRole();
   const editing = !!expense;
   const { data: config } = useGetConfigQuery();
@@ -104,7 +106,7 @@ export function ExpenseFormDialog({ open, onClose, expense }: { open: boolean; o
               helperText={errors.appointmentId || (doctorId && visits.length === 0 ? t('This specialist has no visit with an owner doctor’s patient.') : undefined)}
             >
               <MenuItem value="">{t('No visit')}</MenuItem>
-              {visits.map((v) => <MenuItem key={v.id} value={String(v.id)}>{formatDate(v.date)} · {v.time} · {fullName(v.patient)}</MenuItem>)}
+              {visits.map((v) => <MenuItem key={v.id} value={String(v.id)}>{formatDate(v.date)} · {fmtTime(v.time)} · {fullName(v.patient)}</MenuItem>)}
             </TextField>
           </>
         )}

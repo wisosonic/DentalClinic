@@ -8,6 +8,7 @@ import { useLanguage } from '../../i18n';
 import { errorMessage } from '../../lib/baseQuery';
 import { STATUS_HEX, addDays, formatDate, fullName, statusLabel } from '../../lib/format';
 import { useGetConfigQuery, useGetUnitsQuery, useListAppointmentsQuery } from '../clinical/clinicalApi';
+import { useTimeFormat } from '../../lib/useTime';
 
 interface Props {
   showCancelled: boolean;
@@ -27,6 +28,7 @@ const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${St
  */
 export default function UnitDayView({ showCancelled, onSelect, onCreateAt }: Props) {
   const { t } = useTranslation();
+  const fmtTime = useTimeFormat();
   const { dir } = useLanguage();
   const { data: config } = useGetConfigQuery();
   const { data: units = [], isLoading: loadingUnits } = useGetUnitsQuery();
@@ -102,7 +104,7 @@ export default function UnitDayView({ showCancelled, onSelect, onCreateAt }: Pro
               <Box sx={{ position: 'relative', height }}>
                 {hours.map((h) => (
                   <Typography key={h} variant="caption" color="text.secondary" dir="ltr" sx={{ position: 'absolute', top: (h - start) * PX_PER_MIN - 8, insetInlineEnd: 6 }}>
-                    {hhmm(h)}
+                    {fmtTime(hhmm(h))}
                   </Typography>
                 ))}
               </Box>
@@ -131,7 +133,7 @@ export default function UnitDayView({ showCancelled, onSelect, onCreateAt }: Pro
                         key={a.id}
                         component="button"
                         type="button"
-                        aria-label={t('{{start}} to {{end}}, {{name}}, {{status}}', { start: a.time, end: a.endTime, name: fullName(a.patient), status: statusLabel(a.status) })}
+                        aria-label={t('{{start}} to {{end}}, {{name}}, {{status}}', { start: fmtTime(a.time), end: fmtTime(a.endTime), name: fullName(a.patient), status: statusLabel(a.status) })}
                         onClick={(e: React.MouseEvent) => { e.stopPropagation(); onSelect(a.id); }}
                         sx={{
                           position: 'absolute', top, insetInlineStart: cancelled ? '40%' : 4, insetInlineEnd: 4, height: blockHeight, overflow: 'hidden',
@@ -140,7 +142,7 @@ export default function UnitDayView({ showCancelled, onSelect, onCreateAt }: Pro
                           textDecoration: cancelled ? 'line-through' : 'none', '&:hover, &:focus-visible': { filter: 'brightness(0.92)', outline: '2px solid #000' },
                         }}
                       >
-                        <strong dir="ltr">{a.time}–{a.endTime}</strong> {fullName(a.patient)}
+                        <strong dir="ltr">{fmtTime(a.time)}–{fmtTime(a.endTime)}</strong> {fullName(a.patient)}
                         {blockHeight > 40 && <><br />{t('Dr {{name}}', { name: `${a.doctor.fname} ${a.doctor.lname}` })}</>}
                       </Box>
                     );

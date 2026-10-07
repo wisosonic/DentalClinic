@@ -17,6 +17,7 @@ import { ReportDialog } from '../visits/ReportDialog';
 import { ReportView } from '../visits/ReportView';
 import { PlanDialog } from './PlanDialog';
 import { AppointmentFormDialog, durationLabel, type FormDefaults } from './AppointmentFormDialog';
+import { TimeText } from '../../lib/useTime';
 
 type Action = 'confirm' | 'cancel' | 'complete' | 'no-show';
 
@@ -115,7 +116,7 @@ function Detail({ id, onClose, onEdit }: { id: number; onClose: () => void; onEd
             <Box>
               <Typography variant="h6">{formatDate(a.date)}</Typography>
               <Typography>
-                <bdi dir="ltr">{a.time}–{a.endTime}</bdi> ({durationLabel(a.durationMinutes)}) · {a.clinic?.name ?? t('Deleted clinic')}
+                <TimeText value={a.time} end={a.endTime} /> ({durationLabel(a.durationMinutes)}) · {a.clinic?.name ?? t('Deleted clinic')}
               </Typography>
               {a.unit && <Typography variant="body2" color="text.secondary">{a.unit.name}</Typography>}
             </Box>

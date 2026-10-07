@@ -48,6 +48,12 @@ const PortalDocumentsPage = lazy(() => import('./features/portal/PortalPages').t
 const PortalProfilePage = lazy(() => import('./features/portal/PortalPages').then((m) => ({ default: m.PortalProfilePage })));
 const WaitingRoomPage = lazy(() => import('./features/waiting/WaitingRoomPage').then((m) => ({ default: m.WaitingRoomPage })));
 const WaitingDisplayPage = lazy(() => import('./features/waiting/WaitingDisplayPage').then((m) => ({ default: m.WaitingDisplayPage })));
+const AppointmentsSection = lazy(() => import('./features/settings/OperatingSections').then((m) => ({ default: m.AppointmentsSection })));
+const SecuritySection = lazy(() => import('./features/settings/OperatingSections').then((m) => ({ default: m.SecuritySection })));
+const PortalSection = lazy(() => import('./features/settings/OperatingSections').then((m) => ({ default: m.PortalSection })));
+const UploadsSection = lazy(() => import('./features/settings/OperatingSections').then((m) => ({ default: m.UploadsSection })));
+const DisplaySection = lazy(() => import('./features/settings/OperatingSections').then((m) => ({ default: m.DisplaySection })));
+const TrashAuditSection = lazy(() => import('./features/settings/OperatingSections').then((m) => ({ default: m.TrashAuditSection })));
 const WaitingScreenSection = lazy(() => import('./features/waiting/WaitingScreenSection').then((m) => ({ default: m.WaitingScreenSection })));
 const ClinicsPage = lazy(() => import('./features/clinic/ClinicSettingsPage').then((m) => ({ default: m.ClinicsPage })));
 
@@ -124,6 +130,12 @@ export function App() {
                 <Route path="appearance" element={<Suspense fallback={fallback}><AppearanceSection /></Suspense>} />
                 <Route path="taxes" element={<Suspense fallback={fallback}><TaxesSection /></Suspense>} />
                 <Route path="waiting-room" element={<Suspense fallback={fallback}><WaitingScreenSection /></Suspense>} />
+                <Route path="display" element={<Suspense fallback={fallback}><DisplaySection /></Suspense>} />
+                <Route path="appointments" element={<Suspense fallback={fallback}><AppointmentsSection /></Suspense>} />
+                <Route path="portal" element={<Suspense fallback={fallback}><PortalSection /></Suspense>} />
+                <Route path="security" element={<Suspense fallback={fallback}><SecuritySection /></Suspense>} />
+                <Route path="uploads" element={<Suspense fallback={fallback}><UploadsSection /></Suspense>} />
+                <Route path="trash-and-log" element={<Suspense fallback={fallback}><TrashAuditSection /></Suspense>} />
               </Route>
             <Route path="/settings/clinics" element={<Suspense fallback={fallback}><ClinicsPage /></Suspense>} />
             <Route path="/settings/deleted-clinics" element={<Suspense fallback={fallback}><DeletedClinicsPage /></Suspense>} />

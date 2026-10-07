@@ -41,7 +41,7 @@ export function WaitingDisplayPage() {
   // A call the screen has not shown before is announced with a chime (not the ones already there when the page opened).
   useEffect(() => {
     if (!data) return;
-    const signatures = data.calls.map((c) => `${c.number}|${c.unit}|${c.callCount}|${c.calledAt}`);
+    const signatures = data.calls.map((c) => `${c.label}|${c.unit}|${c.callCount}|${c.calledAt}`);
     if (seen.current && sound && audio.current && signatures.some((s) => !seen.current!.has(s))) chime(audio.current);
     seen.current = new Set(signatures);
   }, [data, sound]);
@@ -65,7 +65,7 @@ export function WaitingDisplayPage() {
     >
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
         <Typography component="h1" sx={{ flexGrow: 1, fontWeight: 800, fontSize: { xs: '1.5rem', md: '2.4rem' } }}>{data?.clinic ?? t('Waiting room')}</Typography>
-        {typeof AudioContext !== 'undefined' && (
+        {typeof AudioContext !== 'undefined' && data?.chime !== false && (
           <Button onClick={toggleSound} aria-pressed={sound} startIcon={sound ? <VolumeUpIcon /> : <VolumeOffIcon />} sx={{ color: '#fff', borderColor: 'rgba(255,255,255,0.6)' }} variant="outlined">
             {sound ? t('Sound on') : t('Turn the sound on')}
           </Button>
@@ -89,11 +89,11 @@ export function WaitingDisplayPage() {
             <Box>
               <Typography sx={{ fontSize: { xs: '1.4rem', md: '2.6rem' }, fontWeight: 700, opacity: 0.9 }}>{t('Now calling')}</Typography>
               <Typography
-                key={`${first.number}-${first.callCount}-${first.calledAt}`}
-                aria-label={t('Number {{n}}', { n: first.number })}
+                key={`${first.label}-${first.callCount}-${first.calledAt}`}
+                aria-label={t('Number {{n}}', { n: first.label })}
                 sx={{ fontSize: { xs: '9rem', md: '20rem' }, fontWeight: 900, lineHeight: 1, '@keyframes pop': { from: { transform: 'scale(0.7)', opacity: 0.2 }, to: { transform: 'scale(1)', opacity: 1 } }, animation: 'pop 0.6s ease-out' }}
               >
-                {first.number}
+                {first.label}
               </Typography>
               {first.unit && <Typography sx={{ fontSize: { xs: '1.8rem', md: '4rem' }, fontWeight: 800 }}>{t('Please go to {{unit}}', { unit: first.unit })}</Typography>}
             </Box>
@@ -101,8 +101,8 @@ export function WaitingDisplayPage() {
           {others.length > 0 && (
             <Box component="ul" sx={{ m: 0, p: 0, listStyle: 'none', display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(auto-fit, minmax(240px, 1fr))' }, gap: 2 }}>
               {others.map((c) => (
-                <Box component="li" key={`${c.number}-${c.unit}`} sx={{ bgcolor: 'rgba(255,255,255,0.14)', borderRadius: 1, p: 2, textAlign: 'center' }}>
-                  <Typography sx={{ fontSize: { xs: '3rem', md: '5rem' }, fontWeight: 900, lineHeight: 1 }}>{c.number}</Typography>
+                <Box component="li" key={`${c.label}-${c.unit}`} sx={{ bgcolor: 'rgba(255,255,255,0.14)', borderRadius: 1, p: 2, textAlign: 'center' }}>
+                  <Typography sx={{ fontSize: { xs: '3rem', md: '5rem' }, fontWeight: 900, lineHeight: 1 }}>{c.label}</Typography>
                   {c.unit && <Typography sx={{ fontSize: { xs: '1.1rem', md: '1.8rem' }, fontWeight: 700 }}>{c.unit}</Typography>}
                 </Box>
               ))}

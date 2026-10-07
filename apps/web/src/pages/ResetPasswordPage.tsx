@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
@@ -6,21 +7,25 @@ import TextField from '@mui/material/TextField';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, useParams } from 'react-router-dom';
-import { passwordSchema } from '@aya/shared';
+import { makePasswordSchema } from '@aya/shared';
 import { z } from 'zod';
 import { AuthCard } from '../components/AuthCard';
 import { useResetPasswordMutation } from '../features/auth/authApi';
 import { errorMessage } from '../lib/baseQuery';
+import { usePublicSettingsQuery } from '../features/settings/settingsApi';
 
-const schema = z
-  .object({ password: passwordSchema, confirm: z.string() })
-  .refine((v) => v.password === v.confirm, { path: ['confirm'], message: 'Passwords do not match' });
-type Values = z.infer<typeof schema>;
+const makeSchema = (minLength: number) =>
+  z
+    .object({ password: makePasswordSchema(minLength), confirm: z.string() })
+    .refine((v) => v.password === v.confirm, { path: ['confirm'], message: 'Passwords do not match' });
+type Values = z.infer<ReturnType<typeof makeSchema>>;
 
 export function ResetPasswordPage() {
   const { t } = useTranslation();
   const { token = '' } = useParams();
   const [reset, { isLoading, isSuccess, error }] = useResetPasswordMutation();
+  const minLength = usePublicSettingsQuery().data?.passwordMinLength ?? 10; // the clinic's rule, known before anyone signs in
+  const schema = useMemo(() => makeSchema(minLength), [minLength]);
   const {
     register,
     handleSubmit,

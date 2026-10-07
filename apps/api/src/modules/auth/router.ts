@@ -13,6 +13,7 @@ import { dummyHash, hashPassword, needsRehash, verifyPassword } from '../../lib/
 import { requireAuth, requireUser } from '../../middleware/auth';
 import { limiter } from '../../middleware/rateLimit';
 import { audit } from '../audit/audit';
+import { operating } from '../settings/operating';
 import {
   REFRESH_COOKIE,
   clearSessionCookies,
@@ -49,10 +50,11 @@ export function authRouter(ctx: AppContext): Router {
       if (user && usable && !locked) {
         await db('users').where({ id: user.id }).increment('failed_logins', 1);
         const fresh = await db('users').where({ id: user.id }).first('failed_logins');
-        if (fresh.failed_logins >= env.MAX_FAILED_LOGINS) {
+        const { maxFailedLogins, lockoutMinutes } = (await operating(ctx)).security;
+        if (fresh.failed_logins >= maxFailedLogins) {
           await db('users')
             .where({ id: user.id })
-            .update({ failed_logins: 0, locked_until: sqlFuture(env.LOCKOUT_MINUTES * MINUTE) });
+            .update({ failed_logins: 0, locked_until: sqlFuture(lockoutMinutes * MINUTE) });
           await audit(ctx, req, { userId: user.id, action: 'auth.lockout' });
         }
       }
@@ -147,7 +149,7 @@ export function authRouter(ctx: AppContext): Router {
       if (body.currentPassword === body.newPassword) {
         throw badRequest('PASSWORD_UNCHANGED', 'New password must be different from the current one');
       }
-      const problem = passwordProblem(body.newPassword, { email: user.email });
+      const problem = passwordProblem(body.newPassword, { email: user.email }, (await operating(ctx)).security.passwordMinLength);
       if (problem) throw badRequest('WEAK_PASSWORD', problem);
 
       await db('users')
@@ -171,7 +173,7 @@ export function authRouter(ctx: AppContext): Router {
     const user = (await db('users').where({ id: token.user_id }).first()) as UserRow | undefined;
     if (!user || !user.is_active) throw invalid();
 
-    const problem = passwordProblem(body.password, { email: user.email });
+    const problem = passwordProblem(body.password, { email: user.email }, (await operating(ctx)).security.passwordMinLength);
     if (problem) throw badRequest('WEAK_PASSWORD', problem);
 
     const password = await hashPassword(body.password, env.BCRYPT_COST);

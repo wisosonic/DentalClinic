@@ -46,7 +46,7 @@ import type { Role } from '@aya/shared';
 const STAFF: Role[] = ['admin', 'doctor', 'staff'];
 
 /** `can`: the page is shown only if the person holds at least one of these permissions (when the server has told us theirs). */
-interface Item { to: string; label: string; icon: ReactNode; roles?: Role[]; notForSpecialists?: boolean; can?: string[] }
+interface Item { to: string; label: string; icon: ReactNode; roles?: Role[]; notForSpecialists?: boolean; can?: string[]; /** shown only while the portal's payments are shown to patients */ needsPortalPayments?: boolean }
 interface Group { id: string; label: string; icon: ReactNode; accent: string; items: Item[] }
 
 /** Related pages together. A group with nothing the person may open is not shown at all. */
@@ -57,7 +57,7 @@ const GROUPS: Group[] = [
     items: [
       { to: '/my/appointments', label: 'My appointments', icon: <EventNoteIcon />, roles: ['patient'] },
       { to: '/my/treatment', label: 'My treatment', icon: <AssignmentIcon />, roles: ['patient'] },
-      { to: '/my/payments', label: 'My payments', icon: <PaymentsIcon />, roles: ['patient'] },
+      { to: '/my/payments', label: 'My payments', icon: <PaymentsIcon />, roles: ['patient'], needsPortalPayments: true },
       { to: '/my/documents', label: 'My documents', icon: <FolderIcon />, roles: ['patient'] },
       { to: '/my/profile', label: 'My profile', icon: <PersonOutlineIcon />, roles: ['patient'] },
     ],
@@ -135,12 +135,12 @@ const itemSx = {
  * The side menu: the dashboard on its own, then groups of related pages. Each group has a coloured
  * header that folds it away (remembered in this browser); the group of the page you are on opens by itself.
  */
-export function SideNav({ role, permissions, specialist, pathname, onNavigate }: { role: Role | undefined; permissions?: string[]; specialist: boolean; pathname: string; onNavigate: () => void }) {
+export function SideNav({ role, permissions, specialist, pathname, onNavigate, portal }: { role: Role | undefined; permissions?: string[]; specialist: boolean; /** the clinic's portal settings, once known */ portal?: { enabled: boolean; showPayments: boolean }; pathname: string; onNavigate: () => void }) {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState<string[]>(readCollapsed);
 
-  const visible = GROUPS.map((g) => ({
-    ...g, items: g.items.filter((i) => (!i.roles || (role && i.roles.includes(role))) && !(i.notForSpecialists && specialist) && (!i.can || !permissions || i.can.some((p) => permissions.includes(p)))),
+  const visible = GROUPS.filter((g) => !(g.id === 'my' && portal && !portal.enabled)).map((g) => ({
+    ...g, items: g.items.filter((i) => (!i.roles || (role && i.roles.includes(role))) && !(i.notForSpecialists && specialist) && !(i.needsPortalPayments && portal && !portal.showPayments) && (!i.can || !permissions || i.can.some((p) => permissions.includes(p)))),
   })).filter((g) => g.items.length > 0);
 
   // Going to a page inside a folded group opens that group.

@@ -257,7 +257,7 @@ describe('the waiting-room screen', () => {
 
   it('shows the numbers being called with their dental units, newest first, and how many wait: never a name', async () => {
     const { key } = await screen();
-    expect((await display(key)).body).toEqual({ calls: [], waiting: 0, clinic: 'Test Clinic' });
+    expect((await display(key)).body).toEqual({ calls: [], waiting: 0, clinic: 'Test Clinic', chime: true });
     const one = await walkIn(staff, s.patientId, s.doctorId, s.unitId);
     const two = await walkIn(staff, s.otherPatientId, s.saraId, s.saraUnitId);
     await walkIn(staff, thirdPatient, s.doctorId, s.unitId);
@@ -268,8 +268,8 @@ describe('the waiting-room screen', () => {
     const res = await display(key);
     expect(res.headers['cache-control']).toContain('no-store');
     expect(res.body.calls).toEqual([
-      { number: 2, unit: "Dr Sara's unit", calledAt: '2026-10-05 07:01:00', callCount: 1 },
-      { number: 1, unit: "Dr Aya's unit", calledAt: '2026-10-05 07:00:00', callCount: 1 },
+      { number: 2, label: '2', unit: "Dr Sara's unit", calledAt: '2026-10-05 07:01:00', callCount: 1 },
+      { number: 1, label: '1', unit: "Dr Aya's unit", calledAt: '2026-10-05 07:00:00', callCount: 1 },
     ]);
     expect(res.body.waiting).toBe(1);
     expect(JSON.stringify(res.body)).not.toMatch(/Pat|Olga|Nora|Ghali|Doughan|patient/i);

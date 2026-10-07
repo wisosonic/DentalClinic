@@ -5,7 +5,8 @@ import {
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useTranslation } from 'react-i18next';
-import { DOCUMENT_CATEGORIES, DOCUMENT_MAX_BYTES, DOCUMENT_MIME_TYPES, type DocumentCategory } from '@aya/shared';
+import { DOCUMENT_CATEGORIES, DOCUMENT_MIME_TYPES, type DocumentCategory } from '@aya/shared';
+import { useGetConfigQuery } from '../clinical/clinicalApi';
 import { errorMessage } from '../../lib/baseQuery';
 import { formatBytes } from '../../lib/format';
 import { DOCUMENT_CATEGORY_LABEL } from './labels';
@@ -35,6 +36,9 @@ export function UploadDocumentsDialog({ open, onClose, patientId, today }: { ope
   const { t } = useTranslation();
   const input = useRef<HTMLInputElement>(null);
   const [upload] = useUploadDocumentMutation();
+  const { data: config } = useGetConfigQuery();
+  const maxMb = config?.documents?.maxMb ?? 25; // the clinic's limit (Settings > Uploads)
+  const sharedByDefault = config?.documents?.visibleByDefault ?? false; // Settings > Patient portal
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [rejected, setRejected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -49,8 +53,8 @@ export function UploadDocumentsDialog({ open, onClose, patientId, today }: { ope
     const good: Draft[] = [];
     for (const file of Array.from(files)) {
       if (!(DOCUMENT_MIME_TYPES as readonly string[]).includes(file.type)) bad.push(t('{{name}}: only PNG, JPEG, WebP and PDF files can be added', { name: file.name }));
-      else if (file.size > DOCUMENT_MAX_BYTES) bad.push(t('{{name}}: the file must be smaller than 25 MB', { name: file.name }));
-      else good.push({ key: nextKey++, file, category: file.type === 'application/pdf' ? 'other' : 'xray', title: stem(file.name), takenOn: today, note: '', patientVisible: false, state: 'ready' });
+      else if (file.size > maxMb * 1024 * 1024) bad.push(t('{{name}}: the file must be smaller than {{mb}} MB', { name: file.name, mb: maxMb }));
+      else good.push({ key: nextKey++, file, category: file.type === 'application/pdf' ? 'other' : 'xray', title: stem(file.name), takenOn: today, note: '', patientVisible: sharedByDefault, state: 'ready' });
     }
     setRejected(bad);
     setDrafts((l) => [...l, ...good]);
@@ -83,7 +87,7 @@ export function UploadDocumentsDialog({ open, onClose, patientId, today }: { ope
       <DialogTitle>{t('Add documents')}</DialogTitle>
       <DialogContent>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          {t('Pictures (PNG, JPEG, WebP) and PDF files, up to 25 MB each. For a CBCT study, add its report as a PDF or screenshots of it.')}
+          {t('Pictures (PNG, JPEG, WebP) and PDF files, up to {{mb}} MB each. For a CBCT study, add its report as a PDF or screenshots of it.', { mb: maxMb })}
         </Typography>
         <input
           ref={input} type="file" multiple accept={DOCUMENT_MIME_TYPES.join(',')} hidden aria-label={t('Document files')}

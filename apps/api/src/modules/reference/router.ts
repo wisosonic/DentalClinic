@@ -1,9 +1,10 @@
 import { Router } from 'express';
-import { DEFAULT_DURATION, DURATION_STEP, MAX_DURATION, MIN_DURATION, type CategoryDto, type ClinicConfigDto, type ToothDto } from '@aya/shared';
+import { DURATION_STEP, MAX_DURATION, MIN_DURATION, type CategoryDto, type ClinicConfigDto, type ToothDto } from '@aya/shared';
 import type { AppContext } from '../../context';
 import { clinicNow } from '../../lib/time';
 import { requireAuth, requirePermission } from '../../middleware/auth';
 import { toCategory } from '../catalog/router';
+import { operating } from '../settings/operating';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any -- DB row
 
@@ -26,15 +27,21 @@ export function referenceRouter(ctx: AppContext): Router {
   });
 
   // Any signed-in user: the booking screens need the slot length and today's date at the clinic.
-  router.get('/config', auth, (_req, res) => {
+  router.get('/config', auth, async (_req, res) => {
+    const set = await operating(ctx);
     const body: ClinicConfigDto = {
-      defaultDuration: DEFAULT_DURATION,
+      defaultDuration: set.appointments.defaultDuration,
       durationStep: DURATION_STEP,
       minDuration: MIN_DURATION,
       maxDuration: MAX_DURATION,
-      cancelMinHours: env.CANCEL_MIN_HOURS,
+      cancelMinHours: set.appointments.cancelMinHours,
       timezone: env.CLINIC_TIMEZONE,
       today: clinicNow(env, ctx.clock()).date,
+      weekStart: set.display.weekStart,
+      timeFormat: set.display.timeFormat,
+      passwordMinLength: set.security.passwordMinLength,
+      documents: { maxMb: set.uploads.maxDocumentMb, maxPerPatient: set.uploads.maxDocumentsPerPatient, visibleByDefault: set.portal.documentsVisibleByDefault },
+      portal: { enabled: set.portal.enabled, showPayments: set.portal.showPayments },
     };
     res.json(body);
   });

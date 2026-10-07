@@ -22,6 +22,7 @@ import { requireAuth, requirePermission, requireUser, type AuthUser } from '../.
 import { audit, auditView } from '../audit/audit';
 import { appointmentBooked, appointmentCancelled, appointmentNoShow } from '../notifications/events';
 import { syncOffersForAppointment } from '../offers/service';
+import { assertPortalOn, operating } from '../settings/operating';
 import { appointmentQuery, assertBookable, assertClinicExists, getBusy, toDtos } from './service';
 
 const idParam = z.coerce.number().int().positive();
@@ -166,7 +167,8 @@ export function appointmentsRouter(ctx: AppContext): Router {
 
   router.post('/', requirePermission('appointments:create'), async (req, res) => {
     const user = requireUser(req);
-    const body = appointmentInputSchema.parse(req.body);
+    const parsed = appointmentInputSchema.parse(req.body);
+    const body = { ...parsed, durationMinutes: parsed.durationMinutes ?? (await operating(ctx)).appointments.defaultDuration };
 
     const patientRow = await db('patients').where({ id: body.patientId }).whereNull('deleted_at').first('id', 'doctor_id');
     // A specialist can only book his own patients, and only with himself as the doctor. Another
@@ -281,6 +283,7 @@ export function appointmentsRouter(ctx: AppContext): Router {
     // Who may do what: the clinical step needs visits:update; patients may only cancel their own.
     if (!isStaff(user)) {
       if (action !== 'cancel') throw forbidden();
+      await assertPortalOn(ctx); // a patient cancels through the portal, which the clinic may switch off
     } else if (action === 'complete') {
       if (!can(user.role, 'visits:update')) throw forbidden();
     } else if (!can(user.role, 'appointments:update')) {
@@ -296,8 +299,9 @@ export function appointmentsRouter(ctx: AppContext): Router {
 
     const now = clinicNow(env, ctx.clock());
     const hours = hoursUntil(now, row.date, row.time);
-    if (!isStaff(user) && hours < env.CANCEL_MIN_HOURS) {
-      throw new HttpError(409, 'TOO_LATE_TO_CANCEL', `Appointments can only be cancelled online at least ${env.CANCEL_MIN_HOURS} hours ahead. Please call the clinic.`, { hours: env.CANCEL_MIN_HOURS });
+    const cancelMinHours = (await operating(ctx)).appointments.cancelMinHours;
+    if (!isStaff(user) && hours < cancelMinHours) {
+      throw new HttpError(409, 'TOO_LATE_TO_CANCEL', `Appointments can only be cancelled online at least ${cancelMinHours} hours ahead. Please call the clinic.`, { hours: cancelMinHours });
     }
     if (action === 'complete' && row.date > now.date) throw new HttpError(409, 'FUTURE_APPOINTMENT', "An appointment that hasn't happened yet can't be completed");
     if (action === 'no-show' && hours > 0) throw new HttpError(409, 'FUTURE_APPOINTMENT', "An appointment that hasn't started yet can't be a no-show");

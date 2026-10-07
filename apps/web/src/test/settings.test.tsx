@@ -57,7 +57,7 @@ describe('the settings page', () => {
     signIn();
     renderApp(<App />, '/settings');
     const nav = await screen.findByRole('navigation', { name: 'Settings sections' });
-    expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual(['General', 'Appearance', 'Taxes', 'Waiting room']);
+    expect(within(nav).getAllByRole('link').map((l) => l.textContent)).toEqual(['General', 'Appearance', 'Date and time', 'Appointments', 'Waiting room', 'Patient portal', 'Security', 'Uploads', 'Trash and activity log', 'Taxes']);
     expect(await screen.findByRole('region', { name: 'General' })).toBeInTheDocument(); // after the redirect
     expect(within(nav).getByRole('link', { name: 'General' })).toHaveAttribute('aria-current', 'page');
   });

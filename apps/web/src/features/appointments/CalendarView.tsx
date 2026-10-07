@@ -13,6 +13,7 @@ import { useLanguage } from '../../i18n';
 import { errorMessage } from '../../lib/baseQuery';
 import { STATUS_HEX, fullName, statusLabel } from '../../lib/format';
 import { useListAppointmentsQuery } from '../clinical/clinicalApi';
+import { useGetConfigQuery } from '../clinical/clinicalApi';
 
 interface Props {
   doctorId?: number;
@@ -43,6 +44,9 @@ export default function CalendarView({ doctorId, unitId, showCancelled, onSelect
   const { lang, dir } = useLanguage();
   const mobile = useMediaQuery(useTheme().breakpoints.down('sm'));
   const [range, setRange] = useState<{ from: string; to: string } | null>(null);
+  const { data: config } = useGetConfigQuery();
+  const hour12 = config?.timeFormat === '12h';
+  const firstDay = { monday: 1, sunday: 0, saturday: 6 }[config?.weekStart ?? 'monday'];
 
   const { data, isFetching, error } = useListAppointmentsQuery(
     range
@@ -100,7 +104,7 @@ export default function CalendarView({ doctorId, unitId, showCancelled, onSelect
       {isFetching && <LinearProgress sx={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 5 }} />}
       {error && <Alert severity="error" sx={{ mb: 1 }}>{errorMessage(error)}</Alert>}
       <FullCalendar
-        key={`${mobile ? 'mobile' : 'desktop'}-${lang}`} // re-create when the breakpoint or language changes
+        key={`${mobile ? 'mobile' : 'desktop'}-${lang}-${firstDay}-${hour12}`} // re-create when the breakpoint or language changes
         plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
         locales={[arabicLocale]}
         locale={lang === 'ar' ? arabicLocale.code : 'en'}
@@ -112,15 +116,15 @@ export default function CalendarView({ doctorId, unitId, showCancelled, onSelect
             : { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' }
         }
         buttonText={{ today: t('Today'), month: t('Month'), week: t('Week'), day: t('Day'), list: t('List') }}
-        firstDay={1}
+        firstDay={firstDay}
         nowIndicator
         allDaySlot={false}
         height="auto"
         slotMinTime="07:00:00"
         slotMaxTime="21:00:00"
         slotDuration="00:15:00"
-        slotLabelFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
-        eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
+        slotLabelFormat={{ hour: hour12 ? 'numeric' : '2-digit', minute: '2-digit', hour12 }}
+        eventTimeFormat={{ hour: hour12 ? 'numeric' : '2-digit', minute: '2-digit', hour12 }}
         events={events}
         datesSet={onDatesSet}
         eventClick={(arg: EventClickArg) => onSelect(Number(arg.event.id))}

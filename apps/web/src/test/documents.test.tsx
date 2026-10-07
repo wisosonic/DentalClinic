@@ -199,14 +199,14 @@ describe('adding documents', () => {
     await waitFor(() => expect(within(dialog).getAllByText('Added')).toHaveLength(2));
   });
 
-  it('sends the choice to make a file visible to the patient, and nothing when it is not made', async () => {
+  it('sends the choice to make a file visible to the patient, as yes or no', async () => {
     const dialog = await choose([file('a.png', 'image/png', 50), file('b.png', 'image/png', 60)]);
     api.routes['POST /patients/7/documents'] = () => json(201, { document: doc() });
     await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Visible to the patient, file 2' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Add 2 documents' }));
     await waitFor(() => expect(api.calls.filter((c) => c.method === 'POST' && c.path === '/patients/7/documents')).toHaveLength(2));
     const [first, second] = api.calls.filter((c) => c.method === 'POST' && c.path === '/patients/7/documents');
-    expect(first!.query.get('patientVisible')).toBeNull();
+    expect(first!.query.get('patientVisible')).toBe('0');
     expect(second!.query.get('patientVisible')).toBe('1');
   });
 

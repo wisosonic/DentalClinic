@@ -7,8 +7,8 @@ import { PATIENT, errorBody, json, renderApp, useFakeApi, user } from './mockApi
 const api = useFakeApi();
 
 const CONFIG = { defaultDuration: 30, durationStep: 15, minDuration: 15, maxDuration: 480, cancelMinHours: 24, timezone: 'Asia/Beirut', today: '2026-10-07' };
-const ticket = (extra: object = {}) => ({
-  id: 1, number: 1, date: '2026-10-07', status: 'waiting', patient: { id: 7, fname: 'Hicham', lname: 'Cheaib' }, doctor: { id: 1, fname: 'Aya', lname: 'Ghali' },
+const ticket = (extra: { number?: number; label?: string } & Record<string, unknown> = {}) => ({
+  label: String(extra.number ?? 1), id: 1, number: 1, date: '2026-10-07', status: 'waiting', patient: { id: 7, fname: 'Hicham', lname: 'Cheaib' }, doctor: { id: 1, fname: 'Aya', lname: 'Ghali' },
   unit: { id: 3, name: 'Unit A' }, appointment: null, arrivedAt: '2026-10-07 07:00:00', calledAt: null, callCount: 0, finishedAt: null, ...extra,
 });
 const list = (data: unknown[]) => json(200, { date: '2026-10-07', data });
@@ -169,7 +169,7 @@ describe('the screen in the waiting room', () => {
   };
 
   it('shows the number being called large with the dental unit, the others smaller, and how many wait: never a name', async () => {
-    show('abc', { clinic: 'Hamra Clinic', waiting: 3, calls: [{ number: 12, unit: 'Unit A', calledAt: '2026-10-07 07:10:00', callCount: 1 }, { number: 9, unit: 'Unit B', calledAt: '2026-10-07 07:05:00', callCount: 1 }] });
+    show('abc', { clinic: 'Hamra Clinic', waiting: 3, chime: true, calls: [{ number: 12, label: '12', unit: 'Unit A', calledAt: '2026-10-07 07:10:00', callCount: 1 }, { number: 9, label: '9', unit: 'Unit B', calledAt: '2026-10-07 07:05:00', callCount: 1 }] });
     expect(await screen.findByText('Now calling')).toBeInTheDocument();
     expect(screen.getByLabelText('Number 12')).toHaveTextContent('12');
     expect(screen.getByText('Please go to Unit A')).toBeInTheDocument();
@@ -183,7 +183,7 @@ describe('the screen in the waiting room', () => {
   });
 
   it('asks the people in the room to wait when nobody is being called', async () => {
-    show('abc', { clinic: 'Hamra Clinic', waiting: 0, calls: [] });
+    show('abc', { clinic: 'Hamra Clinic', waiting: 0, chime: true, calls: [] });
     expect(await screen.findByText('Please wait for your number to be called.')).toBeInTheDocument();
     expect(screen.getByText('Nobody is waiting.')).toBeInTheDocument();
   });

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
@@ -5,22 +6,26 @@ import TextField from '@mui/material/TextField';
 import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { passwordSchema } from '@aya/shared';
+import { makePasswordSchema } from '@aya/shared';
 import { z } from 'zod';
 import { AuthCard } from '../components/AuthCard';
 import { useChangePasswordMutation, useGetMeQuery, useLogoutMutation } from '../features/auth/authApi';
 import { errorMessage } from '../lib/baseQuery';
+import { useGetConfigQuery } from '../features/clinical/clinicalApi';
 
-const schema = z
-  .object({ currentPassword: z.string().min(1, 'Enter your current password'), newPassword: passwordSchema, confirm: z.string() })
-  .refine((v) => v.newPassword === v.confirm, { path: ['confirm'], message: 'Passwords do not match' });
-type Values = z.infer<typeof schema>;
+const makeSchema = (minLength: number) =>
+  z
+    .object({ currentPassword: z.string().min(1, 'Enter your current password'), newPassword: makePasswordSchema(minLength), confirm: z.string() })
+    .refine((v) => v.newPassword === v.confirm, { path: ['confirm'], message: 'Passwords do not match' });
+type Values = z.infer<ReturnType<typeof makeSchema>>;
 
 export function ChangePasswordPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { data: user } = useGetMeQuery();
   const [change, { isLoading, error }] = useChangePasswordMutation();
+  const minLength = useGetConfigQuery().data?.passwordMinLength ?? 10; // the clinic's rule (Settings > Security)
+  const schema = useMemo(() => makeSchema(minLength), [minLength]);
   const [logout] = useLogoutMutation();
   const {
     register,

@@ -1,6 +1,12 @@
 import type { ReactNode } from 'react';
 import { Box, List, ListItemButton, ListItemIcon, ListItemText, Paper, Typography } from '@mui/material';
 import CalculateIcon from '@mui/icons-material/Calculate';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
+import EventIcon from '@mui/icons-material/Event';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 import PaletteIcon from '@mui/icons-material/Palette';
 import TuneIcon from '@mui/icons-material/Tune';
 import TvIcon from '@mui/icons-material/Tv';
@@ -12,8 +18,14 @@ import { PageHeader } from '../../components/PageHeader';
 export const SETTINGS_SECTIONS: { to: string; label: string; icon: ReactNode }[] = [
   { to: '/settings/general', label: 'General', icon: <TuneIcon /> },
   { to: '/settings/appearance', label: 'Appearance', icon: <PaletteIcon /> },
-  { to: '/settings/taxes', label: 'Taxes', icon: <CalculateIcon /> },
+  { to: '/settings/display', label: 'Date and time', icon: <ScheduleIcon /> },
+  { to: '/settings/appointments', label: 'Appointments', icon: <EventIcon /> },
   { to: '/settings/waiting-room', label: 'Waiting room', icon: <TvIcon /> },
+  { to: '/settings/portal', label: 'Patient portal', icon: <FavoriteBorderIcon /> },
+  { to: '/settings/security', label: 'Security', icon: <LockOutlinedIcon /> },
+  { to: '/settings/uploads', label: 'Uploads', icon: <CloudUploadIcon /> },
+  { to: '/settings/trash-and-log', label: 'Trash and activity log', icon: <DeleteSweepIcon /> },
+  { to: '/settings/taxes', label: 'Taxes', icon: <CalculateIcon /> },
 ];
 
 /** The page of a section nobody has put anything in yet. */

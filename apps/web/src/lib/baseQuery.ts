@@ -70,6 +70,8 @@ function dynamicMessage(code: string | undefined, d: Record<string, unknown> | u
       return translate('The doctor already has an appointment from {{start}} to {{end}}', { start: d.start, end: d.end });
     case 'UNIT_BUSY':
       return translate('The dental unit is already in use from {{start}} to {{end}}', { start: d.start, end: d.end });
+    case 'TOO_MANY_DOCUMENTS':
+      return typeof d.max === 'number' ? translate('A patient can have at most {{n}} documents', { n: d.max }) : null;
     case 'TOO_LATE_TO_CANCEL':
       return translate('Appointments can only be cancelled online at least {{hours}} hours ahead. Please call the clinic.', { hours: d.hours });
     case 'NOT_EDITABLE':

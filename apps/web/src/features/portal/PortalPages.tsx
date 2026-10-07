@@ -21,6 +21,8 @@ import { ReportView } from '../visits/ReportView';
 import { useGetMyPatientQuery } from '../clinical/clinicalApi';
 import { AppointmentCard } from './AppointmentCard';
 import { useGetPortalDocumentsQuery, useGetPortalOffersQuery, useGetPortalOverviewQuery, useGetPortalPaymentsQuery, useGetPortalUpcomingQuery } from './portalApi';
+import { TimeText } from '../../lib/useTime';
+import { useTimeFormat } from '../../lib/useTime';
 
 const Loading = () => {
   const { t } = useTranslation();
@@ -33,6 +35,7 @@ const Empty = ({ children }: { children: string }) => <Paper sx={{ p: 3, textAli
 // ---------------------------------------------------------------------------------------------------------------------
 export function PortalAppointmentsPage() {
   const { t } = useTranslation();
+  const fmtTime = useTimeFormat();
   const { data: overview } = useGetPortalOverviewQuery();
   const { data: upcoming, error: upcomingError, isLoading } = useGetPortalUpcomingQuery();
   const { data: timeline, error: timelineError, isLoading: loadingHistory } = useGetTimelineQuery({ patientId: 'me', pageSize: 100 });
@@ -59,9 +62,9 @@ export function PortalAppointmentsPage() {
           <Stack spacing={1}>
             {history.map(({ appointment: a, report, hasReport }) => (
               <Accordion key={a.id} disableGutters>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />} aria-label={`${formatDate(a.date)} ${a.time}`}>
+                <AccordionSummary expandIcon={<ExpandMoreIcon />} aria-label={`${formatDate(a.date)} ${fmtTime(a.time)}`}>
                   <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap', width: '100%', paddingInlineEnd: 1 }}>
-                    <Typography fontWeight={700}>{formatDate(a.date)} · <bdi dir="ltr">{a.time}</bdi></Typography>
+                    <Typography fontWeight={700}>{formatDate(a.date)} · <TimeText value={a.time} /></Typography>
                     <Typography color="text.secondary">{t('Dr. {{name}}', { name: `${a.doctor.fname} ${a.doctor.lname}` })}</Typography>
                     <Chip size="small" color={STATUS_COLOR[a.status]} label={statusLabel(a.status)} />
                     {a.categories.map((c) => <Chip key={c} size="small" variant="outlined" label={c} />)}
@@ -98,7 +101,7 @@ export function PortalTreatmentPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mb: 0.5 }}>
                 <Typography variant="h6" component="h2" sx={{ flexGrow: 1 }}>{o.title}</Typography>
                 <WorkStateChip state={o.workState} />
-                <PaymentStateChip state={o.paymentState} />
+                {o.paymentState && <PaymentStateChip state={o.paymentState} />}
               </Box>
               {o.description && <Typography color="text.secondary" sx={{ mb: 1 }}>{o.description}</Typography>}
               {o.doctor && <Typography variant="body2" color="text.secondary">{t('Dr. {{name}}', { name: `${o.doctor.fname} ${o.doctor.lname}` })}</Typography>}
@@ -121,7 +124,7 @@ export function PortalTreatmentPage() {
                         <TableCell>{i.description}</TableCell>
                         <TableCell>{i.tooth ? <bdi dir="ltr">{i.tooth}</bdi> : '—'}</TableCell>
                         <TableCell><Chip size="small" label={t(ITEM_STATUS_LABEL[i.status])} color={ITEM_STATUS_COLOR[i.status]} /></TableCell>
-                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{i.visit ? <>{formatDate(i.visit.date)} <bdi dir="ltr">{i.visit.time}</bdi></> : '—'}</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{i.visit ? <>{formatDate(i.visit.date)} <TimeText value={i.visit.time} /></> : '—'}</TableCell>
                         <TableCell align="right">{formatMoney(i.price)}</TableCell>
                       </TableRow>
                     ))}
@@ -130,8 +133,12 @@ export function PortalTreatmentPage() {
               </TableContainer>
               <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap', mt: 2, alignItems: 'flex-end' }}>
                 <Box><Typography variant="caption" color="text.secondary">{t('Total')}</Typography><Typography variant="h6">{formatMoney(o.price)}</Typography></Box>
-                <Box><Typography variant="caption" color="text.secondary">{t('Paid')}</Typography><Typography variant="h6">{formatMoney(o.paid)}</Typography></Box>
-                <Box><Typography variant="caption" color="text.secondary">{t('Still to pay')}</Typography><Typography variant="h6" color={o.remaining > 0 ? 'warning.main' : 'success.main'}>{formatMoney(o.remaining)}</Typography></Box>
+                {o.paid !== undefined && o.remaining !== undefined && (
+                  <>
+                    <Box><Typography variant="caption" color="text.secondary">{t('Paid')}</Typography><Typography variant="h6">{formatMoney(o.paid)}</Typography></Box>
+                    <Box><Typography variant="caption" color="text.secondary">{t('Still to pay')}</Typography><Typography variant="h6" color={o.remaining > 0 ? 'warning.main' : 'success.main'}>{formatMoney(o.remaining)}</Typography></Box>
+                  </>
+                )}
                 <Box sx={{ flexGrow: 1 }} />
                 <Button startIcon={<PictureAsPdfIcon />} component="a" href={`/api/v1/portal/offers/${o.id}/pdf`} target="_blank" rel="noopener">{t('Print the plan (PDF)')}</Button>
               </Box>

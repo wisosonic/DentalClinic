@@ -36,8 +36,10 @@ export interface PortalOverviewDto {
   /** The next appointment, if any. */
   next: PortalAppointmentDto | null;
   upcomingCount: number;
-  /** Over the treatment offers the patient has agreed to. */
-  balance: { price: number; paid: number; remaining: number; currency: string };
+  /** Over the treatment offers the patient has agreed to; null when the clinic does not show patients money. */
+  balance: { price: number; paid: number; remaining: number; currency: string } | null;
+  /** Whether this clinic shows patients their payments, receipts and balances. */
+  showPayments: boolean;
   /** Documents the clinic has marked as visible to the patient. */
   documentsCount: number;
   /** The notice period for cancelling online, in hours. */
@@ -49,10 +51,11 @@ export interface PortalOfferDto {
   title: string;
   description: string | null;
   price: number;
-  paid: number;
-  remaining: number;
+  /** The three of these are left out when the clinic does not show patients money. */
+  paid?: number;
+  remaining?: number;
   currency: string;
-  paymentState: OfferPaymentState;
+  paymentState?: OfferPaymentState;
   workState: OfferWorkState;
   progress: { done: number; total: number; percent: number };
   doctor: { fname: string; lname: string } | null;

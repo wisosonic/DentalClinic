@@ -62,6 +62,8 @@ export interface PublicSettingsDto {
   language: SettingsLanguage;
   mode: ColorMode;
   textSize: TextSize;
+  /** The shortest password the clinic accepts: the reset page needs it before anyone is signed in. */
+  passwordMinLength: number;
 }
 
 // ---------------------------------------------------------------------------

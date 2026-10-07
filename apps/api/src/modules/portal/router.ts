@@ -11,6 +11,8 @@ import { clinicLetterhead } from '../finance/letterhead';
 import { renderOfferPdf, renderReceiptPdf } from '../finance/pdf';
 import { offerQuery, toOfferDtos } from '../offers/service';
 import { appointmentQuery } from '../appointments/service';
+import { HttpError } from '../../lib/errors';
+import { assertPortalOn, operating } from '../settings/operating';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any -- DB row
 
@@ -27,6 +29,13 @@ export function portalRouter(ctx: AppContext): Router {
   const { db, env } = ctx;
   const router = Router();
   router.use(requireAuth(ctx), requireRole('patient'));
+  // The clinic may switch the portal off (Settings > Patient portal); nothing in it then answers.
+  router.use((_req, _res, next) => { assertPortalOn(ctx).then(() => next(), next); });
+  /** Payments, receipts and balances are shown only when the clinic wants patients to see them. */
+  const showsPayments = async () => (await operating(ctx)).portal.showPayments;
+  const assertShowsPayments = async () => {
+    if (!(await showsPayments())) throw new HttpError(403, 'PAYMENTS_HIDDEN', 'The clinic does not show payments in the patient portal.');
+  };
 
   async function ownRecord(user: AuthUser): Promise<Row> {
     const row = await db('patients').where({ user_id: user.id }).whereNull('deleted_at').first();
@@ -37,6 +46,7 @@ export function portalRouter(ctx: AppContext): Router {
   /** The patient's upcoming appointments that are still on (pending or confirmed), soonest first. */
   async function upcoming(patientId: number): Promise<PortalAppointmentDto[]> {
     const now = clinicNow(env, ctx.clock());
+    const cancelMinHours = (await operating(ctx)).appointments.cancelMinHours;
     const rows: Row[] = await appointmentQuery(db).where('a.patient_id', patientId).whereIn('a.status', ['pending', 'confirmed']).where('a.date', '>=', now.date)
       .orderBy([{ column: 'a.date' }, { column: 'a.time' }, { column: 'a.id' }]);
     const started = rows.filter((r) => hoursUntil(now, r.date, r.time) >= 0);
@@ -48,13 +58,13 @@ export function portalRouter(ctx: AppContext): Router {
     return started.map((r) => {
       const hours = hoursUntil(now, r.date, r.time);
       const clinic = clinics.find((c) => c.id === r.clinic_id);
-      const until = new Date(Date.parse(`${r.date}T${r.time}:00Z`) - env.CANCEL_MIN_HOURS * 3_600_000).toISOString();
+      const until = new Date(Date.parse(`${r.date}T${r.time}:00Z`) - cancelMinHours * 3_600_000).toISOString();
       return {
         id: r.id, date: r.date, time: r.time, endTime: fromMinutes(toMinutes(r.time) + r.duration_minutes), durationMinutes: r.duration_minutes,
         status: r.status as 'pending' | 'confirmed', doctor: { fname: r.d_fname, lname: r.d_lname },
         clinic: clinic ? { name: clinic.name, address: clinic.address ?? null, phone: clinic.phone ?? null } : null,
         procedures: procedures.filter((p) => p.appointment_id === r.id).map((p) => p.name as string),
-        canCancel: hours >= env.CANCEL_MIN_HOURS, cancelUntil: `${until.slice(0, 10)} ${until.slice(11, 16)}`,
+        canCancel: hours >= cancelMinHours, cancelUntil: `${until.slice(0, 10)} ${until.slice(11, 16)}`,
       };
     });
   }
@@ -74,16 +84,18 @@ export function portalRouter(ctx: AppContext): Router {
     const offers = await acceptedOffers(user, patient.id);
     const doctor: Row | undefined = patient.doctor_id ? await db('doctors').where({ id: patient.doctor_id }).first('fname', 'lname') : undefined;
     const documents = Number((await visibleDocuments(patient.id).count({ n: '*' }).first())?.n ?? 0);
+    const settings = await operating(ctx);
     const body: PortalOverviewDto = {
       patient: { id: patient.id, fname: patient.fname, lname: patient.lname, patientIdentifier: patient.patient_identifier, username: patient.username ?? null, doctor: doctor ? { fname: doctor.fname, lname: doctor.lname } : null },
       next: coming[0] ?? null,
       upcomingCount: coming.length,
-      balance: {
+      balance: settings.portal.showPayments ? {
         price: round2(offers.reduce((s, o) => s + o.price, 0)), paid: round2(offers.reduce((s, o) => s + o.paid, 0)),
         remaining: round2(offers.reduce((s, o) => s + o.remaining, 0)), currency: '$',
-      },
+      } : null,
+      showPayments: settings.portal.showPayments,
       documentsCount: documents,
-      cancelMinHours: env.CANCEL_MIN_HOURS,
+      cancelMinHours: settings.appointments.cancelMinHours,
     };
     res.json(body);
   });
@@ -94,9 +106,9 @@ export function portalRouter(ctx: AppContext): Router {
   });
 
   // ----- treatment offers -----------------------------------------------------------------------------------------
-  const toPortalOffer = (o: Awaited<ReturnType<typeof acceptedOffers>>[number]): PortalOfferDto => ({
-    id: o.id, title: o.title, description: o.description, price: o.price, paid: o.paid, remaining: o.remaining, currency: o.currency,
-    paymentState: o.paymentState, workState: o.workState, progress: o.progress,
+  const toPortalOffer = (o: Awaited<ReturnType<typeof acceptedOffers>>[number], money: boolean): PortalOfferDto => ({
+    id: o.id, title: o.title, description: o.description, price: o.price, ...(money && { paid: o.paid, remaining: o.remaining, paymentState: o.paymentState }), currency: o.currency,
+    workState: o.workState, progress: o.progress,
     doctor: o.doctor ? { fname: o.doctor.fname, lname: o.doctor.lname } : null,
     items: (o.items ?? []).map((i) => ({
       id: i.id, sequence: i.sequence, description: i.description, tooth: i.tooth?.index ?? null, price: i.price, status: i.status,
@@ -108,7 +120,8 @@ export function portalRouter(ctx: AppContext): Router {
   router.get('/offers', async (req, res) => {
     const user = requireUser(req);
     const patient = await ownRecord(user);
-    res.json({ data: (await acceptedOffers(user, patient.id)).map(toPortalOffer) });
+    const money = await showsPayments();
+    res.json({ data: (await acceptedOffers(user, patient.id)).map((o) => toPortalOffer(o, money)) });
   });
 
   router.get('/offers/:id/pdf', async (req, res) => {
@@ -123,7 +136,7 @@ export function portalRouter(ctx: AppContext): Router {
         doctor: offer.doctor ? `${offer.doctor.fname} ${offer.doctor.lname}`.trim() : null,
         title: offer.title, description: offer.description, notes: null, // internal notes are the clinic's
         items: (offer.items ?? []).map((i) => ({ description: i.description, tooth: i.tooth?.index ?? null, price: i.price })),
-        price: offer.price, paid: offer.paid,
+        price: offer.price, paid: (await showsPayments()) ? offer.paid : 0, // 0 prints only the total
       },
       { compress: env.NODE_ENV !== 'test' },
     );
@@ -137,6 +150,7 @@ export function portalRouter(ctx: AppContext): Router {
       .where('q.patient_id', patientId).where('pay.type', 'clinic').whereNull('pay.deleted_at').whereNull('q.deleted_at');
 
   router.get('/payments', async (req, res) => {
+    await assertShowsPayments();
     const patient = await ownRecord(requireUser(req));
     const rows: Row[] = await ownPayments(patient.id).select('pay.*', 'q.title as q_title').orderBy([{ column: 'pay.date', order: 'desc' }, { column: 'pay.id', order: 'desc' }]);
     const data: PortalPaymentDto[] = rows.map((r) => ({
@@ -147,6 +161,7 @@ export function portalRouter(ctx: AppContext): Router {
   });
 
   router.get('/payments/:id/receipt', async (req, res) => {
+    await assertShowsPayments();
     const user = requireUser(req);
     const patient = await ownRecord(user);
     const row: Row | undefined = await ownPayments(patient.id).where('pay.id', idParam.parse(req.params.id)).select('pay.*', 'q.title as q_title').first();

@@ -22,6 +22,7 @@ import { validate, type FieldErrors } from '../../lib/zodForm';
 import { useDeleteDocumentMutation, useListDocumentsQuery, useUpdateDocumentMutation } from './documentsApi';
 import { DOCUMENT_CATEGORY_LABEL } from './labels';
 import { UploadDocumentsDialog } from './UploadDocumentsDialog';
+import { TimeText } from '../../lib/useTime';
 
 type SortKey = 'title' | 'kind' | 'taken' | 'by' | 'size' | 'visit';
 
@@ -195,7 +196,7 @@ export function DocumentsSection({
                   </TableCell>
                   <TableCell><Chip size="small" icon={d.isImage ? <ImageIcon /> : <PictureAsPdfIcon />} label={t(DOCUMENT_CATEGORY_LABEL[d.category])} /></TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>{d.takenOn ? formatDate(d.takenOn) : '—'}</TableCell>
-                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{d.appointment ? <>{formatDate(d.appointment.date)} <bdi dir="ltr">{d.appointment.time}</bdi></> : '—'}</TableCell>
+                  <TableCell sx={{ whiteSpace: 'nowrap' }}>{d.appointment ? <>{formatDate(d.appointment.date)} <TimeText value={d.appointment.time} /></> : '—'}</TableCell>
                   <TableCell>{d.uploadedBy?.name || '—'}</TableCell>
                   <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}><bdi dir="ltr">{formatBytes(d.sizeBytes)}</bdi></TableCell>
                   <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>

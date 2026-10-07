@@ -14,6 +14,8 @@ import { fullName } from '../../lib/format';
 import { useGetMeQuery } from '../auth/authApi';
 import { CheckInDialog } from './CheckInDialog';
 import { useGetWaitingListQuery, useWaitingActionMutation } from './waitingApi';
+import { TimeText } from '../../lib/useTime';
+import { useTimeFormat } from '../../lib/useTime';
 
 export const STATUS_LABEL: Record<WaitingStatus, string> = { waiting: 'Waiting', called: 'Called', done: 'Done', left: 'Left' };
 const STATUS_COLOR: Record<WaitingStatus, 'warning' | 'primary' | 'success' | 'default'> = { waiting: 'warning', called: 'primary', done: 'success', left: 'default' };
@@ -31,6 +33,7 @@ const minutesSince = (stamp: string, now: number): number => Math.max(0, Math.fl
  */
 export function WaitingRoomPage() {
   const { t } = useTranslation();
+  const fmtTime = useTimeFormat();
   const { isDoctor, unlinkedDoctor } = useRole();
   const permissions = useGetMeQuery().data?.permissions;
   const can = (p: string) => !permissions || permissions.includes(p);
@@ -61,7 +64,7 @@ export function WaitingRoomPage() {
 
   const buttons = (x: WaitingTicketDto) => {
     if (!canUpdate) return null;
-    const name = `${x.number}`;
+    const name = x.label;
     return (
       <Stack direction="row" gap={0.5} justifyContent="flex-end" flexWrap="wrap">
         {x.status === 'waiting' && <Button size="small" variant="contained" startIcon={<CampaignIcon />} disabled={actState.isLoading} onClick={() => run(x.id, 'call')} aria-label={t('Call number {{n}}', { n: name })}>{t('Call')}</Button>}
@@ -84,7 +87,7 @@ export function WaitingRoomPage() {
         actions={
           <>
             {isDoctor && nextToCall && canUpdate && (
-              <Button variant="contained" startIcon={<CampaignIcon />} disabled={actState.isLoading} onClick={() => run(nextToCall.id, 'call')}>{t('Call the next patient (number {{n}})', { n: nextToCall.number })}</Button>
+              <Button variant="contained" startIcon={<CampaignIcon />} disabled={actState.isLoading} onClick={() => run(nextToCall.id, 'call')}>{t('Call the next patient (number {{n}})', { n: nextToCall.label })}</Button>
             )}
             {can('waiting:create') && <Button variant={isDoctor ? 'outlined' : 'contained'} startIcon={<PersonAddIcon />} onClick={() => setCheckingIn(true)}>{t('Give a number')}</Button>}
           </>
@@ -127,19 +130,19 @@ export function WaitingRoomPage() {
             <TableBody>
               {rows.map((x) => (
                 <TableRow key={x.id} hover selected={x.status === 'called'}>
-                  <TableCell><Typography component="span" variant="h6" fontWeight={800}>{x.number}</Typography></TableCell>
+                  <TableCell><Typography component="span" variant="h6" fontWeight={800}>{x.label}</Typography></TableCell>
                   <TableCell>
                     {fullName(x.patient)}
                     {x.appointment && (
                       <Typography variant="caption" color="text.secondary" display="block">
-                        {t('Appointment at')} <bdi dir="ltr">{x.appointment.time}</bdi>{x.appointment.procedures.length > 0 ? ` · ${x.appointment.procedures.join(', ')}` : ''}
+                        {t('Appointment at')} <TimeText value={x.appointment.time} />{x.appointment.procedures.length > 0 ? ` · ${x.appointment.procedures.join(', ')}` : ''}
                       </Typography>
                     )}
                   </TableCell>
                   <TableCell>{t('Dr. {{name}}', { name: fullName(x.doctor) })}</TableCell>
                   <TableCell>{x.unit?.name ?? '—'}</TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                    <bdi dir="ltr">{new Date(`${x.arrivedAt.replace(' ', 'T')}Z`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</bdi>
+                    <bdi dir="ltr">{fmtTime(new Date(`${x.arrivedAt.replace(' ', 'T')}Z`).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false }))}</bdi>
                     {(x.status === 'waiting' || x.status === 'called') && (
                       <Typography variant="caption" color="text.secondary" display="block">{t('{{n}} min', { n: minutesSince(x.arrivedAt, now) })}</Typography>
                     )}

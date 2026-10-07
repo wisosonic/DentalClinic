@@ -15,11 +15,11 @@ const optionalId = z.preprocess((v) => (v === '' || v === 0 || v === '0' ? null 
 export const DOCUMENT_CATEGORIES = ['xray', 'panoramic', 'cbct', 'blood_test', 'other'] as const;
 export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number];
 
-export const DOCUMENT_MAX_BYTES = 25 * 1024 * 1024;
+export const DOCUMENT_MAX_BYTES = 100 * 1024 * 1024; // the ceiling: the clinic chooses its own limit up to this (Settings > Uploads)
 /** What a person may choose to upload (the server checks the file's own bytes, never this). */
 export const DOCUMENT_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'] as const;
 /** More than this many documents for one patient is refused (runaway disk use). */
-export const DOCUMENT_MAX_PER_PATIENT = 200;
+export const DOCUMENT_MAX_PER_PATIENT = 1000; // the ceiling: the clinic chooses its own limit up to this
 
 /** The details sent with the file (in the query string: the body is the file itself). */
 export const documentUploadSchema = z.object({
@@ -29,7 +29,7 @@ export const documentUploadSchema = z.object({
   appointmentId: optionalId,
   note: optionalText(500),
   /** Mark it as one the patient may see in the portal (phase 8); off by default. */
-  patientVisible: z.enum(['1']).optional(),
+  patientVisible: z.enum(['1', '0']).optional(),
   /** The file's name on the person's computer, for display. */
   name: z.preprocess((v) => (typeof v === 'string' ? v : ''), text(255)).optional(),
   /** Upload even if this patient already has exactly this file. */

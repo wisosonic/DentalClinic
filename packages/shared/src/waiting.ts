@@ -32,6 +32,8 @@ export interface WaitingTicketDto {
   id: number;
   /** Starts again at 1 every day, in each clinic. */
   number: number;
+  /** How the number is written: "12", or "A12" when the clinic shows the dental unit's letter. */
+  label: string;
   date: string;
   status: WaitingStatus;
   patient: { id: number; fname: string; lname: string };
@@ -64,10 +66,12 @@ export interface WaitingCandidateDto {
 /** What the waiting-room screen may show: numbers and dental units, never a name. */
 export interface WaitingDisplayDto {
   /** The patients being called now, the most recent call first: one per dental unit. */
-  calls: { number: number; unit: string | null; calledAt: string; callCount: number }[];
+  calls: { number: number; label: string; unit: string | null; calledAt: string; callCount: number }[];
   /** How many are waiting. */
   waiting: number;
   clinic: string | null;
+  /** Whether the screen offers its chime (Settings > Waiting room). */
+  chime: boolean;
 }
 
 export interface WaitingScreenDto {

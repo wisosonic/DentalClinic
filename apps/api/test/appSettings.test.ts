@@ -92,17 +92,17 @@ describe('appearance settings', () => {
 });
 
 describe('what the app fetches before anyone signs in', () => {
-  it('is the language, the mode and the text size, and nothing else', async () => {
+  it('is the language, the mode, the text size and the shortest password, and nothing else', async () => {
     await admin.put('/settings/general', general({ language: 'ar', clinic: { address: 'Karakol', phone: '1', email: 'a@b.co' } }));
     await admin.put('/settings/appearance', { mode: 'dark', textSize: 'small' });
     const res = await t.client().get('/public-settings');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ language: 'ar', mode: 'dark', textSize: 'small' }); // no timezone, no contact details
+    expect(res.body).toEqual({ language: 'ar', mode: 'dark', textSize: 'small', passwordMinLength: 10 }); // no timezone, no contact details
   });
 
   it('has defaults when nothing was saved', async () => {
     await t.db('app_settings').del();
-    expect((await t.client().get('/public-settings')).body).toEqual({ language: 'en', mode: 'light', textSize: 'medium' });
+    expect((await t.client().get('/public-settings')).body).toEqual({ language: 'en', mode: 'light', textSize: 'medium', passwordMinLength: 10 });
   });
 });
 

@@ -207,6 +207,10 @@ export const messages: Dictionary = {
   "Someone else just made this patient a card: try again": "أنشأ شخص آخر بطاقة لهذا المريض للتو: حاول مرة أخرى",
   "Too many cards. Please wait a minute.": "عدد كبير من البطاقات. انتظر دقيقة.",
   'Invalid email, username or password': 'البريد الإلكتروني أو اسم المستخدم أو كلمة المرور غير صحيحة',
+  "This patient has as many documents as the clinic allows": "لدى هذا المريض أقصى عدد من المستندات تسمح به العيادة",
+  "The clinic does not show payments in the patient portal.": "لا تعرض العيادة الدفعات في بوابة المريض.",
+  "The patient portal is switched off. Please contact the clinic.": "بوابة المريض معطّلة. يرجى التواصل مع العيادة.",
+  "Unknown settings page": "صفحة إعدادات غير معروفة",
   "Ticket not found": "الرقم غير موجود",
   "That appointment is not one that is expected today": "هذا الموعد ليس من المواعيد المتوقعة اليوم",
   "Choose the doctor and the dental unit": "اختر الطبيب ووحدة الأسنان",
@@ -271,7 +275,6 @@ export const messages: Dictionary = {
   'Password is too common': 'كلمة المرور شائعة جداً',
   'Password cannot be a single repeated character': 'لا يمكن أن تتكون كلمة المرور من حرف واحد مكرر',
   'Password must not contain your email name': 'يجب ألا تحتوي كلمة المرور على اسم بريدك الإلكتروني',
-  'Password must be at least 10 characters': 'يجب ألا تقل كلمة المرور عن 10 أحرف',
   'Password must be at most 128 characters': 'يجب ألا تزيد كلمة المرور عن 128 حرفاً',
 
   // Shared form validation

@@ -7,6 +7,7 @@ import { errorMessage } from '../../lib/baseQuery';
 import { fullName } from '../../lib/format';
 import { useGetDoctorsQuery, useGetUnitsQuery } from '../clinical/clinicalApi';
 import { useCheckInWaitingMutation, useGetWaitingCandidatesQuery } from './waitingApi';
+import { TimeText } from '../../lib/useTime';
 
 /**
  * At the desk: give the patient who has just arrived a number. For someone expected today, one click (the doctor and
@@ -56,7 +57,7 @@ export function CheckInDialog({ open, onClose }: { open: boolean; onClose: () =>
         {given ? (
           <Box sx={{ textAlign: 'center', py: 2 }} role="status">
             <Typography color="text.secondary">{t('{{name}} has number', { name: fullName(given.patient) })}</Typography>
-            <Typography sx={{ fontSize: '6rem', fontWeight: 900, lineHeight: 1.1 }} color="primary" aria-label={t('Number {{n}}', { n: given.number })}>{given.number}</Typography>
+            <Typography sx={{ fontSize: '6rem', fontWeight: 900, lineHeight: 1.1 }} color="primary" aria-label={t('Number {{n}}', { n: given.label })}>{given.label}</Typography>
             <Typography>{t('Dr. {{name}}', { name: fullName(given.doctor) })}{given.unit ? ` · ${given.unit.name}` : ''}</Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>{t('Ask them to wait for this number on the screen.')}</Typography>
           </Box>
@@ -70,7 +71,7 @@ export function CheckInDialog({ open, onClose }: { open: boolean; onClose: () =>
               <Stack spacing={1}>
                 {candidates.map((c) => (
                   <Paper key={c.appointmentId} variant="outlined" sx={{ p: 1.25, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                    <Typography sx={{ fontWeight: 700, minWidth: 48 }}><bdi dir="ltr">{c.time}</bdi></Typography>
+                    <Typography sx={{ fontWeight: 700, minWidth: 48 }}><TimeText value={c.time} /></Typography>
                     <Box sx={{ flexGrow: 1, minWidth: 160 }}>
                       <Typography>{fullName(c.patient)}</Typography>
                       <Typography variant="caption" color="text.secondary">{t('Dr. {{name}}', { name: fullName(c.doctor) })}{c.unit ? ` · ${c.unit.name}` : ''}</Typography>

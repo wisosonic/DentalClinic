@@ -17,6 +17,7 @@ import { errorMessage } from '../lib/baseQuery';
 import { STATUS_HEX, formatDate, fullName } from '../lib/format';
 import { BRAND } from '../theme';
 import { PortalHome } from '../features/portal/PortalHome';
+import { useTimeFormat } from '../lib/useTime';
 
 // The charts load on demand so the dashboard opens fast.
 const InsightsSection = lazy(() => import('../features/dashboard/InsightsSection'));
@@ -36,6 +37,7 @@ function StatTile({ icon, label, value, color }: { icon: ReactNode; label: strin
 }
 
 function Today() {
+  const fmtTime = useTimeFormat();
   const { t } = useTranslation();
   const { data: config } = useGetConfigQuery();
   const today = config?.today;
@@ -72,7 +74,7 @@ function Today() {
                 transition: 'transform .15s, box-shadow .15s', '&:hover, &:focus-visible': { transform: 'translateY(-2px)', boxShadow: '0 12px 30px rgba(10,61,77,0.16)' },
               }}
             >
-              <Typography fontWeight={800} sx={{ minWidth: 110, color: 'primary.dark' }} dir="ltr">{a.time}–{a.endTime}</Typography>
+              <Typography fontWeight={800} sx={{ minWidth: 110, color: 'primary.dark' }} dir="ltr">{fmtTime(a.time)}–{fmtTime(a.endTime)}</Typography>
               <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                 <Typography fontWeight={600}>{fullName(a.patient)}</Typography>
                 <Typography variant="body2" color="text.secondary">{t('Dr {{name}}', { name: fullName(a.doctor) })}</Typography>

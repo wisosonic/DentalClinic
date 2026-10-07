@@ -74,7 +74,15 @@ export function useLanguage() {
 }
 
 /** For plain functions (formatting helpers) that can't use the hook. */
-export const translate = (key: string, options?: Record<string, unknown>): string => i18n.t(key, options) as string;
+/** Messages the server builds with a number in them ("at least 12 characters") are translated by their pattern. */
+const NUMBERED: [RegExp, string][] = [[/^Password must be at least (\d+) characters$/, 'Password must be at least {{n}} characters']];
+export const translate = (key: string, options?: Record<string, unknown>): string => {
+  if (!options) for (const [pattern, template] of NUMBERED) {
+    const m = pattern.exec(key);
+    if (m) return i18n.t(template, { n: m[1] }) as string;
+  }
+  return i18n.t(key, options) as string;
+};
 
 /** BCP 47 tag for dates and numbers. Arabic keeps Western digits, as is usual in Lebanon. */
 export const dateLocale = (): string => (i18n.language === 'ar' ? 'ar-LB-u-nu-latn' : 'en-GB');

@@ -18,6 +18,7 @@ import { offersRouter } from './modules/offers/router';
 import { documentRouters } from './modules/documents/router';
 import { settingsRouter } from './modules/settings/tax';
 import { appSettingsRouter, applyTimezone, publicSettingsRouter } from './modules/settings/app';
+import { operatingSettingsRouter } from './modules/settings/operating';
 import { taxRouter } from './modules/finance/tax';
 import { dashboardRouter } from './modules/dashboard/router';
 import { notificationsRouter } from './modules/notifications/router';
@@ -102,6 +103,7 @@ export function createApp(ctx: AppContext): Express {
   api.use('/finance', taxRouter(ctx));
   api.use('/settings', settingsRouter(ctx));
   api.use('/settings', appSettingsRouter(ctx));
+  api.use('/settings', operatingSettingsRouter(ctx)); // after the others: its /:group takes whatever they left
   api.use('/commission', commissionRouter(ctx));
   api.use('/expenses', expensesRouter(ctx));
   api.use('/labs', directoryRouter(ctx, 'labs'));

@@ -17,6 +17,7 @@ import { clinicNow } from '../../lib/time';
 import { whereWords } from '../../lib/search';
 import { limiter } from '../../middleware/rateLimit';
 import { requireAuth, requirePermission, requireUser, type AuthUser } from '../../middleware/auth';
+import { operating } from '../settings/operating';
 import { audit, auditView } from '../audit/audit';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any -- DB row
@@ -152,7 +153,8 @@ export function documentRouters(ctx: AppContext): { forPatient: Router; byId: Ro
   // The file is the raw request body (the logo pattern, no extra dependency); the details travel in the query string.
   forPatient.post(
     '/', requirePermission('documents:create'), limiter(env, { windowMs: 60_000, limit: 60, message: 'Too many uploads. Please wait a minute.' }),
-    express.raw({ type: [...DOCUMENT_MIME_TYPES], limit: DOCUMENT_MAX_BYTES }),
+    // the size limit is the clinic's setting (Settings > Uploads), read for each upload
+    (req, res, next) => { operating(ctx).then((s) => express.raw({ type: [...DOCUMENT_MIME_TYPES], limit: Math.min(s.uploads.maxDocumentMb * 1024 * 1024, DOCUMENT_MAX_BYTES) })(req, res, next), next); },
     async (req, res) => {
       const user = requireUser(req);
       const patientId = idParam.parse((req.params as Record<string, string>).id);
@@ -165,7 +167,8 @@ export function documentRouters(ctx: AppContext): { forPatient: Router; byId: Ro
         throw badRequest('UNKNOWN_APPOINTMENT', 'Unknown appointment');
       }
       const count = Number((await db('patient_documents').where({ patient_id: patientId }).whereNull('deleted_at').count({ n: '*' }).first())?.n ?? 0);
-      if (count >= DOCUMENT_MAX_PER_PATIENT) throw new HttpError(409, 'TOO_MANY_DOCUMENTS', `A patient can have at most ${DOCUMENT_MAX_PER_PATIENT} documents`);
+      const settings = await operating(ctx);
+      if (count >= settings.uploads.maxDocumentsPerPatient) throw new HttpError(409, 'TOO_MANY_DOCUMENTS', 'This patient has as many documents as the clinic allows', { max: settings.uploads.maxDocumentsPerPatient });
       const sha256 = createHash('sha256').update(body).digest('hex');
       if (!input.allowDuplicate && (await db('patient_documents').where({ patient_id: patientId, sha256 }).whereNull('deleted_at').first('id'))) {
         throw new HttpError(409, 'DUPLICATE_DOCUMENT', 'This patient already has exactly this file');
@@ -183,7 +186,7 @@ export function documentRouters(ctx: AppContext): { forPatient: Router; byId: Ro
       try {
         [id] = await db('patient_documents').insert({
           patient_id: patientId, appointment_id: input.appointmentId ?? null, category: input.category, title: input.title, taken_on: input.takenOn ?? clinicNow(env, ctx.clock()).date,
-          note: input.note ?? null, patient_visible: input.patientVisible === '1', file_name: name, original_name: (input.name || `${input.category}.${kind.ext}`).slice(0, 255), mime: kind.mime, size_bytes: body.length,
+          note: input.note ?? null, patient_visible: input.patientVisible === undefined ? settings.portal.documentsVisibleByDefault : input.patientVisible === '1', file_name: name, original_name: (input.name || `${input.category}.${kind.ext}`).slice(0, 255), mime: kind.mime, size_bytes: body.length,
           sha256, uploaded_by: user.id, created_at: now, updated_at: now,
         });
       } catch (err) {

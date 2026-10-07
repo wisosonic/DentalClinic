@@ -22,7 +22,7 @@ export const documentsApi = api.injectEndpoints({
     uploadDocument: build.mutation<PatientDocumentDto, DocumentUploadArgs>({
       query: ({ patientId, file, category, title, takenOn, note, patientVisible, allowDuplicate }) => ({
         url: `/patients/${patientId}/documents`, method: 'POST', body: file, headers: { 'content-type': file.type },
-        params: Object.fromEntries(Object.entries({ category, title, takenOn, note, name: file.name, patientVisible: patientVisible ? '1' : undefined, allowDuplicate: allowDuplicate ? '1' : undefined }).filter(([, v]) => v)) as Record<string, string>,
+        params: Object.fromEntries(Object.entries({ category, title, takenOn, note, name: file.name, patientVisible: patientVisible === undefined ? undefined : patientVisible ? '1' : '0', allowDuplicate: allowDuplicate ? '1' : undefined }).filter(([, v]) => v)) as Record<string, string>,
       }),
       transformResponse: (r: { document: PatientDocumentDto }) => r.document,
       invalidatesTags: ['Document'],

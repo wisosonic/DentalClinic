@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { errorMessage } from '../../lib/baseQuery';
 import { formatDate, statusLabel } from '../../lib/format';
 import { useAppointmentActionMutation } from '../clinical/clinicalApi';
+import { TimeText } from '../../lib/useTime';
 
 /**
  * One upcoming appointment, with its details and a way to cancel it while there is still enough notice. A patient
@@ -28,7 +29,7 @@ export function AppointmentCard({ appointment: a, cancelMinHours }: { appointmen
       <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap" sx={{ mb: 0.5 }}>
         <EventIcon color="primary" fontSize="small" />
         <Typography variant="h6" component="h3" sx={{ flexGrow: 1 }}>
-          {formatDate(a.date)} · <bdi dir="ltr">{a.time}</bdi>
+          {formatDate(a.date)} · <TimeText value={a.time} />
         </Typography>
         <Chip size="small" color={a.status === 'confirmed' ? 'primary' : 'warning'} label={statusLabel(a.status)} />
       </Stack>

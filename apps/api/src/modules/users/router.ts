@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { STAFF_ROLES, emailSchema, passwordProblem, passwordSchema, type Paginated, type PublicUser } from '@aya/shared';
+import { STAFF_ROLES, emailSchema, newPasswordInputSchema, passwordProblem, type Paginated, type PublicUser } from '@aya/shared';
 import type { AppContext } from '../../context';
 import { sqlFuture, sqlNow } from '../../db/connection';
 import { generatePassword, randomToken, sha256 } from '../../lib/crypto';
@@ -8,6 +8,7 @@ import { badRequest, conflict, notFound } from '../../lib/errors';
 import { hashPassword } from '../../lib/password';
 import { requireAuth, requirePermission, requireUser } from '../../middleware/auth';
 import { audit } from '../audit/audit';
+import { operating } from '../settings/operating';
 import { revokeAllForUser, toPublicUser } from '../auth/session';
 
 const idParam = z.coerce.number().int().positive();
@@ -26,7 +27,7 @@ const createBody = z.object({
   name: z.string().trim().min(1).max(255),
   email: emailSchema,
   role: z.enum(STAFF_ROLES),
-  password: passwordSchema.optional(),
+  password: newPasswordInputSchema.optional(),
 });
 
 const updateBody = z
@@ -62,7 +63,7 @@ export function usersRouter(ctx: AppContext): Router {
     const actor = requireUser(req);
     const body = createBody.parse(req.body);
 
-    const problem = body.password ? passwordProblem(body.password, { email: body.email }) : null;
+    const problem = body.password ? passwordProblem(body.password, { email: body.email }, (await operating(ctx)).security.passwordMinLength) : null;
     if (problem) throw badRequest('WEAK_PASSWORD', problem);
     if (await db('users').whereRaw('lower(email) = ?', [body.email]).first('id')) {
       throw conflict('EMAIL_TAKEN', 'A user with this email already exists');

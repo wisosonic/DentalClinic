@@ -6,6 +6,7 @@ import { randomToken, sha256 } from '../../lib/crypto';
 import { effectivePermissions } from '../../lib/permissions';
 import { signAccessToken } from '../../lib/tokens';
 import { ACCESS_COOKIE } from '../../middleware/auth';
+import { operating } from '../settings/operating';
 import { CSRF_COOKIE } from '../../middleware/csrf';
 
 export const REFRESH_COOKIE = 'refresh_token';
@@ -72,7 +73,7 @@ export async function startSession(
 ): Promise<{ refreshTokenId: number }> {
   const { env, db } = ctx;
   const refreshToken = randomToken(32);
-  const ttlMs = (opts.remember ? env.REFRESH_TTL_DAYS_REMEMBER : env.REFRESH_TTL_DAYS) * DAY_MS;
+  const ttlMs = (opts.remember ? (await operating(ctx)).security.rememberDays : env.REFRESH_TTL_DAYS) * DAY_MS;
 
   const [inserted] = await db('refresh_tokens')
     .insert({

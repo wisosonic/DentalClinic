@@ -14,6 +14,7 @@ import { errorMessage } from '../../lib/baseQuery';
 import { formatDate, fullName } from '../../lib/format';
 import { api } from '../auth/authApi';
 import { useDeleteAppointmentMutation, useDeleteUnitMutation } from '../clinical/clinicalApi';
+import { TimeText } from '../../lib/useTime';
 
 const deletedApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -83,7 +84,7 @@ export function DeletedClinicsPage() {
                   <TableBody>
                     {appts.map((a) => (
                       <TableRow key={a.id}>
-                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(a.date)} <bdi dir="ltr">{a.time}</bdi></TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(a.date)} <TimeText value={a.time} /></TableCell>
                         <TableCell><RouterLink to={`/patients/${a.patient.id}`}>{fullName(a.patient)}</RouterLink></TableCell>
                         <TableCell>{fullName(a.doctor)}</TableCell>
                         <TableCell>{a.unit?.name ?? '—'}</TableCell>

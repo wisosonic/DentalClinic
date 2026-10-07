@@ -23,6 +23,7 @@ import { OfferStatusChip, PaymentStateChip, WorkStateChip } from './OfferChips';
 import { ITEM_STATUS_COLOR, ITEM_STATUS_LABEL } from './labels';
 import { OfferFormDialog } from './OfferFormDialog';
 import { useDeleteOfferMutation, useGetOfferQuery, useMarkOfferItemDoneMutation, useMarkOfferItemPendingMutation, useOfferActionMutation } from './offersApi';
+import { TimeText } from '../../lib/useTime';
 
 type SortKey = 'order' | 'description' | 'procedure' | 'tooth' | 'price' | 'cost' | 'status' | 'visit';
 
@@ -176,7 +177,7 @@ export function OfferDetailPage() {
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
                     {i.appointment ? (
                       <>
-                        {formatDate(i.appointment.date)} <bdi dir="ltr">{i.appointment.time}</bdi>
+                        {formatDate(i.appointment.date)} <TimeText value={i.appointment.time} />
                         <Typography variant="caption" color="text.secondary" component="span" sx={{ marginInlineStart: 1 }}>{statusLabel(i.appointment.status as never)}</Typography>
                       </>
                     ) : i.completedAt ? formatDate(i.completedAt.slice(0, 10)) : '—'}
