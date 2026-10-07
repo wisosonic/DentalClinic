@@ -185,6 +185,9 @@ describe('the patient card', () => {
     const fresh = printedPassword(reset);
     expect((await signIn('karim.nasr', 'Green-River-Stone-5')).status).toBe(401);
     expect((await signIn('karim.nasr', fresh)).body.user.mustChangePassword).toBe(true);
+    // the username is the same one, in both places, after any number of cards
+    expect(await t.db('patients').where({ id: p.id }).first('username')).toMatchObject({ username: 'karim.nasr' });
+    expect(await t.db('users').where({ id: (await t.db('patients').where({ id: p.id }).first('user_id')).user_id }).first('username')).toMatchObject({ username: 'karim.nasr' });
     const refresh = await me.post('/auth/refresh');
     expect(refresh.status).toBe(401); // their old session is over
     expect(JSON.parse((await t.db('audit_log').where({ action: 'patient.card' }).orderBy('id', 'desc').first()).diff)).toEqual({ created: false, reset: true });

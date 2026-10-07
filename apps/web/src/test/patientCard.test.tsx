@@ -65,8 +65,8 @@ describe('the username and the patient card on the patient page', () => {
     api.routes['POST /patients/7/card'] = () => pdf();
     await userEvent.click(await screen.findByRole('button', { name: 'Patient card' }));
     const dialog = await screen.findByRole('dialog', { name: 'Patient card' });
-    expect(within(dialog).getByText(/earlier card stops working/)).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Make a new card' }));
+    expect(within(dialog).getByText(/earlier card stops working. The username stays the same/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Reset the password and make a new card' }));
     await within(dialog).findByRole('link', { name: 'Open the card' });
     expect(cardCalls()[0]!.body).toEqual({});
   });
@@ -76,10 +76,10 @@ describe('the username and the patient card on the patient page', () => {
     api.routes['POST /patients/7/card'] = () => pdf();
     await userEvent.click(await screen.findByRole('button', { name: 'Patient card' }));
     const dialog = await screen.findByRole('dialog', { name: 'Patient card' });
-    expect(within(dialog).getByText(/already chosen their own password/)).toBeInTheDocument();
-    const make = within(dialog).getByRole('button', { name: 'Make a new card' });
+    expect(within(dialog).getByText(/already chosen their own password. Resetting it/)).toBeInTheDocument();
+    const make = within(dialog).getByRole('button', { name: 'Reset the password and make a new card' });
     expect(make).toBeDisabled();
-    await userEvent.click(within(dialog).getByRole('checkbox', { name: /I understand/ }));
+    await userEvent.click(within(dialog).getByRole('checkbox', { name: /I understand: reset/ }));
     expect(make).toBeEnabled();
     await userEvent.click(make);
     await within(dialog).findByRole('link', { name: 'Open the card' });

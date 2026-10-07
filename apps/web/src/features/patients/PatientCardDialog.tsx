@@ -84,14 +84,14 @@ export function PatientCardDialog({ open, onClose, patient }: { open: boolean; o
           <>
             {state === 'none' && <Typography>{t('This creates the patient’s login: their username and a first password, printed on the card. They must change the password the first time they sign in.')}</Typography>}
             {state === 'waiting' && (
-              <Alert severity="info">{t('The patient has not changed the first password yet. A new card makes a new first password, and the one on the earlier card stops working.')}</Alert>
+              <Alert severity="info">{t('The patient has not changed the first password yet. A new card makes a new first password, and the one on the earlier card stops working. The username stays the same.')}</Alert>
             )}
             {state === 'active' && (
               <>
                 <Alert severity="warning" sx={{ mb: 1 }}>
-                  {t('The patient has already chosen their own password. A new card replaces it with a new first password and signs the patient out everywhere.')}
+                  {t('The patient has already chosen their own password. Resetting it gives a new first password on a new card and signs the patient out everywhere. The username stays the same.')}
                 </Alert>
-                <FormControlLabel control={<Checkbox checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />} label={t('I understand: replace the patient’s password')} />
+                <FormControlLabel control={<Checkbox checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />} label={t('I understand: reset the patient’s password')} />
               </>
             )}
           </>
@@ -101,7 +101,7 @@ export function PatientCardDialog({ open, onClose, patient }: { open: boolean; o
         <Button onClick={close} disabled={busy}>{card ? t('Close') : t('Cancel')}</Button>
         {!card && (
           <Button variant="contained" onClick={create} disabled={busy || mustConfirm}>
-            {busy ? t('Making the card…') : state === 'none' ? t('Create the card') : t('Make a new card')}
+            {busy ? t('Making the card…') : state === 'none' ? t('Create the card') : t('Reset the password and make a new card')}
           </Button>
         )}
       </DialogActions>

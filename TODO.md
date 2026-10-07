@@ -13,17 +13,6 @@ Last updated 2026-10-06, after phase 7 and its follow-ups, editable roles, treat
 
 ---
 
-## Patient portal follow-ups
-
-The portal is built (see CLAUDE.md). Left:
-
-- [ ] **Owner: confirm the patient reminder lead time.** Patients are reminded **a day ahead** (24 hours) of a confirmed appointment, in the bell only (no email, SMS or WhatsApp); say if it should be another time, or if patients should also be told about payments or a new treatment plan
-- [ ] Owner: say if patients forgetting their password need a self-service reset (the clinic sends no email, so for now staff make a new patient card or an admin hands a one-time link from *Users*)
-- [ ] Optional: make the portal installable as an app (PWA: manifest and an offline shell)
-- [ ] Look at the portal pages on a phone and on a desktop, in both languages and in dark mode, with a real patient login
-
----
-
 ## Patient documents follow-ups
 
 The documents, their previews and the "visible to the patient" mark are built, and the portal shows the marked ones (see CLAUDE.md). Left:
