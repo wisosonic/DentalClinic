@@ -84,6 +84,7 @@ npm run typecheck
 npm run lint                 # ESLint (typescript-eslint, react-hooks); CI runs it too
 npm run build                # web production build
 npm run db:migrate
+npm run db:dump [-- file] [--with-uploads]   # consistent copy of the SQLite database (VACUUM INTO), never overwrites
 npm run db:setup -- --admin-name "Dr Name" --admin-email you@clinic.example   # new installation: schema, teeth, first admin
 npm run user:set-password -w apps/api -- <email> [password]
 ```

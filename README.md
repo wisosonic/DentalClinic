@@ -43,6 +43,10 @@ npm run user:set-password -w apps/api -- you@clinic.example
 
 It prints a random password, and you must change it at the next sign-in. The clinic sends **no email**: a forgotten password is fixed by an admin under *Users*, who makes a one-time **reset link** (valid 24 hours, lets the person choose their own password) or a temporary password and hands it over in person or by phone. *Users* also creates accounts, including logins for doctors (then link the login under *Doctors > Edit*), and switches accounts on or off.
 
+### Backups and moving to another server
+
+`npm run db:dump -- --with-uploads` writes a checked copy of the whole database (schema and data) to `apps/api/data/backups/`, with the patient document files next to it. It is safe while the app runs and never overwrites a file. To restore, or to move to a new host: stop the app, copy the dump to the path in `DB_FILENAME`, copy the documents folder to `apps/api/data/uploads`, and run `npm run db:migrate` (it should say the database is up to date). The data lives only in those files, never in Git. A MySQL deployment needs `mysqldump` instead (this command refuses MySQL), and there is no SQLite-to-MySQL data transfer yet.
+
 ### Opening the app from another device on the same network
 
 The dev server listens on every network interface. Restart `npm run dev`, find this computer's address (`ipconfig`, the IPv4 line, for example 192.168.18.183) and open `http://192.168.18.183:5180` on the other device. Only port 5180 is needed: the web server forwards `/api` to the API, so the browser sees one origin and CORS does not come into it. If it still does not open, Windows Firewall is blocking it: allow Node.js on **private** networks (or allow inbound TCP 5180). Set `APP_URL=http://192.168.18.183:5180` in `apps/api/.env` so reset links made on the Users page open on the other device; `CORS_ORIGIN` (comma-separated) is only for a browser app that calls the API directly on port 4000.
@@ -100,6 +104,7 @@ Doctors have no fixed working days or hours, so any day and time can be booked. 
 | `npm test` | All tests (API and web) |
 | `npm run typecheck` | TypeScript check of every package |
 | `npm run db:migrate` | Apply database migrations |
+| `npm run db:dump [-- file] [--with-uploads]` | Dump the database (schema and data) to one SQLite file in `apps/api/data/backups/`, checked and never overwriting; `--with-uploads` also copies the patient documents. Restore: stop the app and copy the file to `DB_FILENAME` |
 | `npm run db:setup -- --admin-name ... --admin-email ...` | New installation: schema, the 32 teeth, the first administrator (safe to repeat) |
 | `npm run user:set-password -w apps/api -- <email> [password]` | Set a user's password (forces a change at next login) |
 

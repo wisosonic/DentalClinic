@@ -341,7 +341,7 @@ PATIENT  (simplified layout, bottom nav on mobile)
 | Dependencies | `npm audit` in CI, Dependabot, lockfile committed |
 | Errors | no stack traces to clients; central error handler; consistent 401/403/404 (don't leak existence) |
 | Privacy | health data is sensitive → data-retention policy, patient data export/delete process; check local regulation (GDPR-like/HIPAA if applicable) |
-| Hygiene | rotate the admin password & `remember_token` from the provided dump |
+| Hygiene | the first administrator gets a random temporary password from `db:setup` and must change it at first sign-in (the old dump is gone) |
 
 ---
 
