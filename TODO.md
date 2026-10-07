@@ -41,5 +41,4 @@ The documents, their previews and the "visible to the patient" mark are built, a
 - [ ] Production deployment: HTTPS, `NODE_ENV=production`, `TRUST_PROXY`, a real `JWT_SECRET`, reverse proxy
 - [ ] Backups: schedule `npm run db:dump -- --with-uploads` (the database file plus the documents) and keep copies off the server; a MySQL deployment needs `mysqldump` instead, and a SQLite-to-MySQL data transfer is not built
 - [ ] Before go-live: run `npm run db:setup` on the new server (it prints the first administrator's temporary password once), sign in and change it; set `NODE_ENV=production`, HTTPS and `TRUST_PROXY`
-- [ ] Drop the unused `roles` / `role_user` tables
 - [ ] Docs: user guide (English and Arabic), backup and restore, deployment

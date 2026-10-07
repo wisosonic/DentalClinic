@@ -496,7 +496,7 @@ Answered on 2026-10-01. These override anything earlier in this document that di
 |---|---|
 | `payments.remaining` | The balance left on the quote after that payment. Always calculated by the server. |
 | `dr_part` (payments and `clinic_doctor`) | A **percentage** (100 = 100%), copied from the doctor's setting when a payment is made. |
-| Old `roles` / `role_user` tables | Not needed. Drop them before launch. Auth uses `users.role` and the permission matrix. |
+| Old `roles` / `role_user` tables | Not needed, and not created by `001_initial_schema`. Auth uses `users.role` and the permission matrix. |
 | Doctor schedules | **None.** No doctor has fixed working days or hours; they depend only on their appointments' dates and times. The only booking rule is that one doctor cannot have two overlapping appointments. This replaces the working-hours, working-days and "outside hours" rules built in phase 3, and removes the need for weekly-hours scheduling. |
 | Opening days | Moot: with no fixed hours, any day can take an appointment. |
 | Appointment length | **Variable**, chosen per appointment in 15-minute steps (default 30). The doctor or an admin can change it later. Start times are in 15-minute steps. Existing appointments become 30 minutes. |
