@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Alert, Box, Button, Divider, Paper, Skeleton, Typography } from '@mui/material';
+import { Alert, Box, Button, Divider, Link, Paper, Skeleton, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
 import type { AppointmentStatus, DashboardChartsDto } from '@aya/shared';
@@ -8,7 +8,8 @@ import { STATUS_HEX, formatDate, fullName, statusLabel } from '../../lib/format'
 import { formatMoney } from '../../lib/money';
 import { dateLocale } from '../../i18n';
 import { MonthlyChart } from '../finance/MonthlyChart';
-import { BarList } from './BarList';
+import { BAR_COLORS, BarList } from './BarList';
+import { MonthChart, type Palette } from './MonthChart';
 import { useDashboardChartsQuery } from './dashboardApi';
 
 function Card({ title, note, children, action }: { title: string; note?: string; children: ReactNode; action?: ReactNode }) {
@@ -40,10 +41,15 @@ function MoneyCharts({ data }: { data: DashboardChartsDto }) {
   const status = (data.appointmentsByStatus ?? []).filter((s) => s.count > 0);
   const procedures = data.topProcedures ?? [];
   const debts = data.topDebts ?? [];
+  const monthKeys = months.map((m) => m.month);
+  const profit = months.map((m) => Math.round((m.payments - m.expenses) * 100) / 100);
+  const owed = (data.debtsByMonth ?? []).map((m) => m.owed);
+  const perMonth = (data.appointmentsByMonth ?? []).map((m) => m.count);
+  const profitAndDebts = [...(doctor ? [] : profit), ...owed];
 
   return (
     <>
-      {/* The month chart takes the first column of its row; the other places are kept for charts to come. */}
+      {/* The money by month: what came in and went out, the profit (an admin: a doctor has no expenses) and the debts. */}
       <Box sx={{ gridColumn: '1 / -1', display: 'grid', gap: 2, gridTemplateColumns: COLUMNS }}>
         {quiet ? (
           <Card title={doctor ? t('Collected, last 6 months') : t('Payments and expenses, last 6 months')}>
@@ -51,6 +57,31 @@ function MoneyCharts({ data }: { data: DashboardChartsDto }) {
           </Card>
         ) : (
           <MonthlyChart months={months} showExpenses={!doctor} narrow title={doctor ? t('Collected, last 6 months') : t('Payments and expenses, last 6 months')} />
+        )}
+        {profitAndDebts.every((v) => v === 0) ? (
+          <Card title={doctor ? t('Debts, last 6 months') : t('Profit and debts, last 6 months')} note={doctor ? t('What your patients owed at the end of each month.') : t('Profit is payments less expenses; debts are what patients owed at the end of the month.')}>
+            <Empty>{doctor ? t('Nobody owed anything in the last 6 months.') : t('No money came in, went out or was owed in the last 6 months.')}</Empty>
+          </Card>
+        ) : (
+          <MonthChart
+            months={monthKeys}
+            title={doctor ? t('Debts, last 6 months') : t('Profit and debts, last 6 months')}
+            note={doctor ? t('What your patients owed at the end of each month.') : t('Profit is payments less expenses; debts are what patients owed at the end of the month.')}
+            series={[
+              ...(doctor ? [] : [{ id: 'profit', name: t('Profit'), values: profit, color: (k: Palette, v: number) => (v >= 0 ? k.good : k.bad), format: formatMoney }]),
+              { id: 'owed', name: t('Owed'), values: owed, color: (k: Palette) => k.debt, format: formatMoney },
+            ]}
+            legend={(k) => (doctor ? [] : [{ color: k.good, text: t('Profit') }, { color: k.bad, text: t('Loss') }, { color: k.debt, text: t('Owed at the end of the month') }])}
+          />
+        )}
+        {perMonth.every((v) => v === 0) ? (
+          <Card title={t('Appointments per month')} note={t('Cancelled visits are left out.')}><Empty>{t('No appointments in the last 6 months.')}</Empty></Card>
+        ) : (
+          <MonthChart
+            months={monthKeys} whole title={t('Appointments per month')} note={t('Cancelled visits are left out; the current month counts what is booked for the rest of it.')}
+            series={[{ id: 'count', name: t('Appointments'), values: perMonth, color: (k: Palette) => k.count, format: (n: number) => new Intl.NumberFormat(dateLocale()).format(n) }]}
+            legend={() => []}
+          />
         )}
       </Box>
 
@@ -81,8 +112,8 @@ function MoneyCharts({ data }: { data: DashboardChartsDto }) {
           <Empty>{t('Nobody owes anything.')}</Empty>
         ) : (
           <BarList
-            label={t('Biggest debts')} color="#7b1fa2"
-            items={debts.map((d) => ({ key: d.patient.id, label: <RouterLink to={`/patients/${d.patient.id}`}>{fullName(d.patient)}</RouterLink>, value: d.owed, display: formatMoney(d.owed) }))}
+            label={t('Biggest debts')} color={BAR_COLORS.debt}
+            items={debts.map((d) => ({ key: d.patient.id, label: <Link component={RouterLink} to={`/patients/${d.patient.id}`} underline="hover" color="text.primary" sx={{ fontWeight: 600, '&:hover, &:focus-visible': { color: 'primary.main' } }}>{fullName(d.patient)}</Link>, value: d.owed, display: formatMoney(d.owed) }))}
           />
         )}
       </Card>

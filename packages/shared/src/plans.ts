@@ -74,8 +74,12 @@ export interface DashboardChartsDto {
   role: 'admin' | 'doctor' | 'staff';
   /** Admin and doctor: the last six months. A doctor's months hold only collections from his own patients (expenses are 0). */
   byMonth?: { month: string; payments: number; expenses: number }[];
+  /** Admin and doctor: what patients owed at the end of each of the same six months (today for the current one), over the offers they have agreed to. A doctor's figure is his own patients' only. */
+  debtsByMonth?: { month: string; owed: number }[];
   /** Admin and doctor: who owes the most, as things stand today. */
   topDebts?: { patient: { id: number; fname: string; lname: string }; owed: number }[];
+  /** Admin and doctor: appointments in each of the same six months (the current month whole, upcoming days included), cancelled ones left out. A doctor's count is the visits he treats or his own patients'. */
+  appointmentsByMonth?: { month: string; count: number }[];
   /** Admin and doctor: appointments of the last 30 days, by status. */
   appointmentsByStatus?: { status: string; count: number }[];
   /** Admin and doctor: the most booked procedures of the last 90 days (cancelled and no-show left out). */

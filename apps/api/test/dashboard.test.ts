@@ -44,7 +44,7 @@ describe('who may open the charts', () => {
     const hash = bcrypt.hashSync(PASSWORD, 4);
     await t.db('users').insert({ name: 'Loose Doc', email: 'loose@clinic.test', role: 'doctor', password: hash, ...stamp });
     const loose = await loggedIn(t, 'loose@clinic.test');
-    expect(await charts(loose)).toEqual({ role: 'doctor', byMonth: [], topDebts: [], appointmentsByStatus: [], topProcedures: [] });
+    expect(await charts(loose)).toEqual({ role: 'doctor', byMonth: [], debtsByMonth: [], appointmentsByMonth: [], topDebts: [], appointmentsByStatus: [], topProcedures: [] });
   });
 });
 
@@ -93,6 +93,69 @@ describe('admin and doctor', () => {
     expect((await charts(admin)).topDebts.map((d: { owed: number }) => d.owed)).toEqual([900, 500]);
     expect((await charts(aya)).topDebts).toEqual([{ patient: { id: s.patientId, fname: 'Pat', lname: 'Patient' }, owed: 500 }]);
     expect((await charts(ext)).topDebts.map((d: { owed: number }) => d.owed)).toEqual([900]);
+  });
+
+  it('works out what was owed at the end of each of the six months, today for the current one', async () => {
+    const dated = async (patient_id: number, price: number, created: string) =>
+      (await t.db('treatment_offers').insert({ title: 'Q', type: 'clinic', price, cost: 0, currency: '$', status: 'accepted', patient_id, created_at: `${created} 09:00:00`, updated_at: `${created} 09:00:00` }))[0]!;
+    const a = await dated(s.patientId, 500, '2026-07-10'); // agreed in July
+    const b = await dated(s.patientId, 300, '2026-09-20'); // agreed in September
+    await dated(s.patientId, 999, '2026-03-01'); // agreed long ago, paid in full below
+    const old = (await t.db('treatment_offers').where({ price: 999 }).first()).id;
+    await pay(old, 999, '2026-03-02');
+    await pay(a, 200, '2026-08-05');
+    await pay(a, 100, '2026-10-01');
+    await pay(b, 300, '2026-10-02');
+    await dated(s.patientId, 70, '2026-08-01').then((id) => t.db('treatment_offers').where({ id }).update({ status: 'draft' })); // a draft is not owed
+    const r = await charts(admin);
+    expect(r.debtsByMonth).toEqual([
+      { month: '2026-05', owed: 0 },
+      { month: '2026-06', owed: 0 },
+      { month: '2026-07', owed: 500 }, // a: 500 owed at the end of July
+      { month: '2026-08', owed: 300 }, // a: 500 - 200
+      { month: '2026-09', owed: 600 }, // a: 300, b: 300
+      { month: '2026-10', owed: 200 }, // today: a: 500 - 300 = 200, b paid in full
+    ]);
+    // the last month agrees with the biggest-debts list, as things stand today
+    expect(r.debtsByMonth.at(-1).owed).toBe(r.topDebts.reduce((sum: number, d: { owed: number }) => sum + d.owed, 0));
+  });
+
+  it('shows a doctor only his own patients’ debts by month, and staff and patients none', async () => {
+    const mine = await quote(s.patientId, 400);
+    await quote(extPatient, 900);
+    await pay(mine, 100, '2026-10-02');
+    expect((await charts(aya)).debtsByMonth.at(-1)).toEqual({ month: '2026-10', owed: 300 });
+    expect((await charts(ext)).debtsByMonth.at(-1)).toEqual({ month: '2026-10', owed: 900 });
+    expect((await charts(admin)).debtsByMonth.at(-1)).toEqual({ month: '2026-10', owed: 1200 });
+    expect(await charts(staff)).not.toHaveProperty('debtsByMonth');
+  });
+
+  it('counts the appointments of each of the six months, the current one whole, leaving out the cancelled', async () => {
+    await visit(s.patientId, s.doctorId, '2026-10-02', 'completed'); // earlier this month
+    await visit(s.patientId, s.doctorId, '2026-10-28', 'confirmed', '09:00'); // later this month: it counts
+    await visit(s.patientId, s.doctorId, '2026-10-03', 'cancelled', '11:00'); // cancelled: not counted
+    await visit(s.patientId, s.doctorId, '2026-10-04', 'no_show', '12:00'); // missed: counted
+    await visit(s.patientId, s.doctorId, '2026-08-15', 'completed');
+    await visit(s.patientId, s.doctorId, '2026-08-16', 'pending', '10:30');
+    await visit(s.patientId, s.doctorId, '2026-04-30', 'completed'); // before the six months
+    await visit(s.patientId, s.doctorId, '2026-11-01', 'confirmed'); // after the current month
+    const gone = await visit(s.patientId, s.doctorId, '2026-09-10', 'completed', '14:00');
+    await t.db('appointments').where({ id: gone }).update({ deleted_at: '2026-10-01 00:00:00' }); // in the Trash
+    const r = await charts(admin);
+    expect(r.appointmentsByMonth).toEqual([
+      { month: '2026-05', count: 0 }, { month: '2026-06', count: 0 }, { month: '2026-07', count: 0 },
+      { month: '2026-08', count: 2 }, { month: '2026-09', count: 0 }, { month: '2026-10', count: 3 },
+    ]);
+  });
+
+  it('counts a doctor only his own visits and his own patients’ by month, and staff and patients none', async () => {
+    await visit(s.patientId, s.doctorId, '2026-10-02', 'completed'); // Aya's patient, Aya treats
+    await visit(extPatient, s.externalDoctorId, '2026-10-02', 'completed', '11:00'); // the outside specialist's own patient
+    await visit(s.patientId, s.externalDoctorId, '2026-10-03', 'completed', '12:00'); // the specialist treats Aya's patient: both see it
+    expect((await charts(aya)).appointmentsByMonth.at(-1)).toEqual({ month: '2026-10', count: 2 });
+    expect((await charts(ext)).appointmentsByMonth.at(-1)).toEqual({ month: '2026-10', count: 2 });
+    expect((await charts(admin)).appointmentsByMonth.at(-1)).toEqual({ month: '2026-10', count: 3 });
+    expect(await charts(staff)).not.toHaveProperty('appointmentsByMonth');
   });
 
   it('counts the last 30 days of appointments by status, with every status listed', async () => {

@@ -70,7 +70,7 @@ export function dashboardRouter(ctx: AppContext): Router {
     const role = user.role === 'admin' ? 'admin' : 'doctor';
     const mine = scope.all ? null : scope.doctorId;
     if (!scope.all && mine === null) {
-      res.json({ role, byMonth: [], topDebts: [], appointmentsByStatus: [], topProcedures: [] } satisfies DashboardChartsDto);
+      res.json({ role, byMonth: [], debtsByMonth: [], appointmentsByMonth: [], topDebts: [], appointmentsByStatus: [], topProcedures: [] } satisfies DashboardChartsDto);
       return;
     }
     const ownVisits = (qb: any) => { if (mine !== null) qb.where((w: any) => w.where('a.doctor_id', mine).orWhere('p.doctor_id', mine)); }; // eslint-disable-line @typescript-eslint/no-explicit-any -- Knex builder
@@ -87,6 +87,30 @@ export function dashboardRouter(ctx: AppContext): Router {
       perPatient.set(r.patient_id, cur);
     }
 
+    // What was owed at the end of each month: the offers made by then, less the payments dated by then (a month still
+    // running ends today). It uses each offer's price as it is now, so it is an honest picture, not an accounting history.
+    const payments: Row[] = owing.length ? await db('payments').whereIn('offer_id', owing.map((r) => r.id)).whereNull('deleted_at').select('offer_id', 'date', 'amount') : [];
+    const debtsByMonth = byMonth.map((m) => {
+      const [y, mo] = m.month.split('-').map(Number) as [number, number];
+      const last = new Date(Date.UTC(y, mo, 0)).toISOString().slice(0, 10); // the month's last day
+      const end = last < today ? last : today;
+      let owed = 0;
+      for (const o of owing) {
+        if (String(o.created_at).slice(0, 10) > end) continue;
+        const paid = payments.filter((p) => p.offer_id === o.id && String(p.date) <= end).reduce((sum, p) => sum + Number(p.amount), 0);
+        owed += Math.max(0, round2(Number(o.price) - paid));
+      }
+      return { month: m.month, owed: round2(owed) };
+    });
+
+    // Visits in each of the six months, the current one whole (what is booked for the rest of it counts), cancelled ones left out.
+    const firstDay = `${byMonth[0]?.month ?? today.slice(0, 7)}-01`;
+    const lastDay = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 0)).toISOString().slice(0, 10);
+    const perMonth: Row[] = await db('appointments as a').join('patients as p', 'p.id', 'a.patient_id').whereNull('a.deleted_at').whereNull('p.deleted_at')
+      .whereIn('a.status', [...ACTIVE_STATUSES, 'no_show']).whereBetween('a.date', [firstDay, lastDay]).modify(ownVisits)
+      .select(db.raw('substr(a.date, 1, 7) as month')).count({ n: '*' }).groupByRaw('substr(a.date, 1, 7)');
+    const appointmentsByMonth = byMonth.map((m) => ({ month: m.month, count: Number(perMonth.find((r) => r.month === m.month)?.n ?? 0) }));
+
     const since = addDays(today, -29);
     const byStatus: Row[] = await db('appointments as a').join('patients as p', 'p.id', 'a.patient_id').whereNull('a.deleted_at').whereNull('p.deleted_at')
       .whereBetween('a.date', [since, today]).modify(ownVisits).select('a.status').count({ n: '*' }).groupBy('a.status');
@@ -98,6 +122,8 @@ export function dashboardRouter(ctx: AppContext): Router {
     const body: DashboardChartsDto = {
       role,
       byMonth,
+      debtsByMonth,
+      appointmentsByMonth,
       topDebts: [...perPatient.values()].sort((a, b) => b.owed - a.owed).slice(0, 5),
       appointmentsByStatus: APPOINTMENT_STATUSES.map((status) => ({ status, count: Number(byStatus.find((r) => r.status === status)?.n ?? 0) })),
       topProcedures: procedures.map((r) => ({ id: r.id, name: r.name, count: Number(r.n) })),
