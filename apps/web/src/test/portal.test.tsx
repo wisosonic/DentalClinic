@@ -92,7 +92,8 @@ describe('the patient’s home', () => {
     expect(within(dialog).getByText(/The clinic will be told/)).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Keep it' }));
     expect(api.calls.some((c) => c.method === 'POST' && c.path === '/appointments/5/cancel')).toBe(false);
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel appointment' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument()); // the dialog finishes closing before the next click
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel appointment' }));
     await userEvent.click(within(await screen.findByRole('dialog', { name: 'Cancel this appointment?' })).getByRole('button', { name: 'Cancel appointment' }));
     await waitFor(() => expect(api.calls.some((c) => c.method === 'POST' && c.path === '/appointments/5/cancel')).toBe(true));
     expect(await screen.findByText('Appointment cancelled', undefined, { timeout: 4000 })).toBeInTheDocument();

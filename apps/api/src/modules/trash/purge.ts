@@ -95,6 +95,7 @@ export async function erase(trx: Conn, f: Footprint): Promise<void> {
   await del('appointment_tooth', 'appointment_id', f.appointments);
   await del('appointments', 'id', f.appointments);
   await del('treatment_offers', 'id', f.offers);
+  await del('waiting_tickets', 'patient_id', f.patients); // the numbers given at the desk: day-to-day records, not counted in the warning
   await del('event_patient', 'patient_id', f.patients);
   await del('patients', 'id', f.patients);
   if (f.userId) {

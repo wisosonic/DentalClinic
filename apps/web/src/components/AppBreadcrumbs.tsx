@@ -10,6 +10,7 @@ import { fullName } from '../lib/format';
 /** Section pages, by path. The label is the English text of the menu item. */
 const SECTIONS: Record<string, string> = {
   '/appointments': 'Appointments',
+  '/waiting-room': 'Waiting room',
   '/patients': 'Patients',
   '/treatment-offers': 'Treatment offers',
   '/lab-orders': 'Lab orders',
@@ -42,7 +43,7 @@ const SECTIONS: Record<string, string> = {
 const PATIENT_LISTS = ['/payments', '/treatment-offers', '/lab-orders'];
 
 /** The sections of the settings page, by path. */
-const SETTINGS_SECTION_LABEL: Record<string, string> = { '/settings/general': 'General', '/settings/appearance': 'Appearance', '/settings/taxes': 'Taxes' };
+const SETTINGS_SECTION_LABEL: Record<string, string> = { '/settings/general': 'General', '/settings/appearance': 'Appearance', '/settings/taxes': 'Taxes', '/settings/waiting-room': 'Waiting room' };
 
 /**
  * Where you are, with a link back to each level: Dashboard > Section > (a patient's name).

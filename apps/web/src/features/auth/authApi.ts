@@ -10,7 +10,7 @@ interface UserResponse {
 export const api = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
-  tagTypes: ['Patient', 'Appointment', 'Doctor', 'Clinic', 'Unit', 'Report', 'Timeline', 'Medication', 'Category', 'User', 'Trash', 'Audit', 'Offer', 'Document', 'Payment', 'Expense', 'Commission', 'LabOrder', 'Directory', 'Tax', 'Settings', 'Notification', 'Roles'],
+  tagTypes: ['Patient', 'Appointment', 'Doctor', 'Clinic', 'Unit', 'Report', 'Timeline', 'Medication', 'Category', 'User', 'Trash', 'Audit', 'Offer', 'Document', 'Payment', 'Expense', 'Commission', 'LabOrder', 'Directory', 'Tax', 'Settings', 'Notification', 'Roles', 'Waiting'],
   endpoints: (build) => ({
     getMe: build.query<PublicUser, void>({
       query: () => '/auth/me',

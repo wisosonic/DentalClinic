@@ -46,6 +46,9 @@ const PortalTreatmentPage = lazy(() => import('./features/portal/PortalPages').t
 const PortalPaymentsPage = lazy(() => import('./features/portal/PortalPages').then((m) => ({ default: m.PortalPaymentsPage })));
 const PortalDocumentsPage = lazy(() => import('./features/portal/PortalPages').then((m) => ({ default: m.PortalDocumentsPage })));
 const PortalProfilePage = lazy(() => import('./features/portal/PortalPages').then((m) => ({ default: m.PortalProfilePage })));
+const WaitingRoomPage = lazy(() => import('./features/waiting/WaitingRoomPage').then((m) => ({ default: m.WaitingRoomPage })));
+const WaitingDisplayPage = lazy(() => import('./features/waiting/WaitingDisplayPage').then((m) => ({ default: m.WaitingDisplayPage })));
+const WaitingScreenSection = lazy(() => import('./features/waiting/WaitingScreenSection').then((m) => ({ default: m.WaitingScreenSection })));
 const ClinicsPage = lazy(() => import('./features/clinic/ClinicSettingsPage').then((m) => ({ default: m.ClinicsPage })));
 
 function Fallback() {
@@ -66,6 +69,8 @@ export function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+        {/* the screen in the waiting room: no sign-in, the secret is in its address */}
+        <Route path="/waiting-display" element={<Suspense fallback={fallback}><WaitingDisplayPage /></Suspense>} />
 
         <Route element={<ProtectedRoute />}>
           <Route path="/change-password" element={<ChangePasswordPage />} />
@@ -91,6 +96,7 @@ export function App() {
               <Route path="/treatment-offers/:id" element={<Suspense fallback={fallback}><OfferDetailPage /></Suspense>} />
               <Route path="/treatment-plans/*" element={<Navigate to="/treatment-offers" replace />} />
               <Route path="/quotes" element={<Navigate to="/treatment-offers" replace />} />
+              <Route path="/waiting-room" element={<Suspense fallback={fallback}><WaitingRoomPage /></Suspense>} />
               <Route path="/lab-orders" element={<Suspense fallback={fallback}><LabOrdersPage /></Suspense>} />
               <Route path="/reports" element={<Suspense fallback={fallback}><ReportsPage /></Suspense>} />
             </Route>
@@ -117,6 +123,7 @@ export function App() {
                 <Route path="general" element={<Suspense fallback={fallback}><GeneralSection /></Suspense>} />
                 <Route path="appearance" element={<Suspense fallback={fallback}><AppearanceSection /></Suspense>} />
                 <Route path="taxes" element={<Suspense fallback={fallback}><TaxesSection /></Suspense>} />
+                <Route path="waiting-room" element={<Suspense fallback={fallback}><WaitingScreenSection /></Suspense>} />
               </Route>
             <Route path="/settings/clinics" element={<Suspense fallback={fallback}><ClinicsPage /></Suspense>} />
             <Route path="/settings/deleted-clinics" element={<Suspense fallback={fallback}><DeletedClinicsPage /></Suspense>} />

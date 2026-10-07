@@ -3,6 +3,7 @@ import { Box, List, ListItemButton, ListItemIcon, ListItemText, Paper, Typograph
 import CalculateIcon from '@mui/icons-material/Calculate';
 import PaletteIcon from '@mui/icons-material/Palette';
 import TuneIcon from '@mui/icons-material/Tune';
+import TvIcon from '@mui/icons-material/Tv';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink, Outlet, useLocation } from 'react-router-dom';
 import { PageHeader } from '../../components/PageHeader';
@@ -12,6 +13,7 @@ export const SETTINGS_SECTIONS: { to: string; label: string; icon: ReactNode }[]
   { to: '/settings/general', label: 'General', icon: <TuneIcon /> },
   { to: '/settings/appearance', label: 'Appearance', icon: <PaletteIcon /> },
   { to: '/settings/taxes', label: 'Taxes', icon: <CalculateIcon /> },
+  { to: '/settings/waiting-room', label: 'Waiting room', icon: <TvIcon /> },
 ];
 
 /** The page of a section nobody has put anything in yet. */

@@ -16,6 +16,7 @@ const ACTION_LABEL: Record<Action, string> = { read: 'View', create: 'Add', upda
 
 /** The areas of the app, in plain words. An area the server lists that is not here shows under its own name. */
 const AREA_LABEL: Record<string, string> = {
+  waiting: 'Waiting room',
   patients: 'Patients', appointments: 'Appointments', visits: 'Visit reports', teeth: 'Teeth', categories: 'Procedures',
   medications: 'Medications', documents: 'Documents', offers: 'Treatment offers', labs: 'Labs', suppliers: 'Suppliers', payments: 'Payments',
   expenses: 'Expenses', doctors: 'Doctors', clinics: 'Clinics', events: 'Events', promotions: 'Promotions', notifications: 'Notifications', reports: 'Reports',

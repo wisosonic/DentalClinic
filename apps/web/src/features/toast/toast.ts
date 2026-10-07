@@ -92,11 +92,20 @@ export const TOAST_MESSAGES: Record<string, string> = {
   deleteCommissionPayment: 'Commission payment moved to the Trash',
   restoreTrash: 'Restored',
   purgeTrash: 'Erased for good',
+  checkInWaiting: 'Number given',
+  resetWaitingScreen: 'Screen address made',
   deleteAuditEntry: 'Entry deleted',
   clearAudit: 'Log cleared',
 };
 
 /** Messages that depend on what was done to an appointment. */
+export const WAITING_ACTION_MESSAGES: Record<string, string> = {
+  call: 'Patient called',
+  finish: 'Marked as finished',
+  leave: 'Removed from the waiting room',
+  requeue: 'Put back to waiting',
+};
+
 export const OFFER_ACTION_MESSAGES: Record<string, string> = {
   accept: 'Offer accepted',
   cancel: 'Offer cancelled',
@@ -127,7 +136,7 @@ toastListener.startListening({
     if (meta?.arg?.type !== 'mutation') return;
     const endpoint = meta.arg.endpointName ?? '';
     const verb = meta.arg.originalArgs?.action ?? '';
-    const key = endpoint === 'appointmentAction' ? ACTION_MESSAGES[verb] : endpoint === 'offerAction' ? OFFER_ACTION_MESSAGES[verb] : endpoint === 'labOrderAction' ? LAB_ACTION_MESSAGES[verb] : TOAST_MESSAGES[endpoint];
+    const key = endpoint === 'appointmentAction' ? ACTION_MESSAGES[verb] : endpoint === 'offerAction' ? OFFER_ACTION_MESSAGES[verb] : endpoint === 'labOrderAction' ? LAB_ACTION_MESSAGES[verb] : endpoint === 'waitingAction' ? WAITING_ACTION_MESSAGES[verb] : TOAST_MESSAGES[endpoint];
     if (key) api.dispatch(toastAdded({ id: nanoid(), message: translate(key) }));
   },
 });

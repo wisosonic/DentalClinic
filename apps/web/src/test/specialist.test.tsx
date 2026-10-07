@@ -67,7 +67,7 @@ describe('external specialist', () => {
     await screen.findByRole('heading', { name: /Welcome/ });
     const nav = screen.getAllByRole('navigation', { hidden: true }).find((n) => n.getAttribute('aria-label') === 'Main')!;
     const labels = within(nav).getAllByRole('link', { hidden: true }).map((l) => l.textContent);
-    expect(labels).toEqual(['Dashboard', 'Appointments', 'Patients', 'Treatment offers', 'Lab orders', 'Reports', 'By doctor', 'Payments', 'Commission', 'Medications']);
+    expect(labels).toEqual(['Dashboard', 'Appointments', 'Waiting room', 'Patients', 'Treatment offers', 'Lab orders', 'Reports', 'By doctor', 'Payments', 'Commission', 'Medications']);
   });
 
   it('is sent back to the dashboard from the doctors and clinics page', async () => {

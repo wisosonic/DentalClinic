@@ -26,7 +26,7 @@ import { BRAND } from '../theme';
 
 const DRAWER_WIDTH = 240;
 /** Where the gear in the header leads: the sections of the settings page (not the other pages under /settings/). */
-const SETTINGS_PATHS = ['/settings/general', '/settings/appearance', '/settings/taxes'];
+const SETTINGS_PATHS = ['/settings/general', '/settings/appearance', '/settings/taxes', '/settings/waiting-room'];
 
 export function AppLayout() {
   const { t } = useTranslation();

@@ -18,9 +18,9 @@ const signIn = (role: string) => {
 
 describe('navigation by role', () => {
   it.each([
-    ['admin', ['Appointments', 'Patients', 'Treatment offers', 'Lab orders', 'Reports', 'Doctors', 'Clinics', 'Summary', 'Income tax', 'By doctor', 'Payments', 'Expenses', 'Commission', 'Medications', 'Procedures', 'Labs', 'Suppliers', 'Deleted clinics’ data', 'Users', 'Roles', 'Trash', 'Activity log']],
-    ['doctor', ['Appointments', 'Patients', 'Treatment offers', 'Lab orders', 'Reports', 'Doctors', 'By doctor', 'Payments', 'Commission', 'Medications']],
-    ['staff', ['Appointments', 'Patients', 'Treatment offers', 'Lab orders', 'Reports', 'Payments', 'Expenses', 'Labs', 'Suppliers']],
+    ['admin', ['Appointments', 'Waiting room', 'Patients', 'Treatment offers', 'Lab orders', 'Reports', 'Doctors', 'Clinics', 'Summary', 'Income tax', 'By doctor', 'Payments', 'Expenses', 'Commission', 'Medications', 'Procedures', 'Labs', 'Suppliers', 'Deleted clinics’ data', 'Users', 'Roles', 'Trash', 'Activity log']],
+    ['doctor', ['Appointments', 'Waiting room', 'Patients', 'Treatment offers', 'Lab orders', 'Reports', 'Doctors', 'By doctor', 'Payments', 'Commission', 'Medications']],
+    ['staff', ['Appointments', 'Waiting room', 'Patients', 'Treatment offers', 'Lab orders', 'Reports', 'Payments', 'Expenses', 'Labs', 'Suppliers']],
     ['patient', ['My appointments', 'My treatment', 'My payments', 'My documents', 'My profile']],
   ])('%s sees the right menu', async (role, items) => {
     signIn(role);

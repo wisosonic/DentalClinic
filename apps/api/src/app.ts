@@ -26,6 +26,7 @@ import { paymentsRouter } from './modules/finance/router';
 import { summaryRouter } from './modules/finance/summary';
 import { patientsRouter } from './modules/patients/router';
 import { portalRouter } from './modules/portal/router';
+import { waitingDisplayRouter, waitingRouter } from './modules/waiting/router';
 import { referenceRouter } from './modules/reference/router';
 import { categoriesRouter, medicationsRouter } from './modules/catalog/router';
 import { visitReportRouter } from './modules/visits/router';
@@ -107,6 +108,8 @@ export function createApp(ctx: AppContext): Express {
   api.use('/suppliers', directoryRouter(ctx, 'suppliers'));
   api.use('/lab-orders', labOrdersRouter(ctx));
   api.use('/portal', portalRouter(ctx));
+  api.use('/waiting-display', waitingDisplayRouter(ctx));
+  api.use('/waiting-room', waitingRouter(ctx));
   api.use('/treatment-offers', offersRouter(ctx));
   api.use('/notifications', notificationsRouter(ctx));
   api.use('/reports', reportsRouter(ctx));

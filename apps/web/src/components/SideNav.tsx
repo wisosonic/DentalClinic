@@ -8,6 +8,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import EventNoteIcon from '@mui/icons-material/EventNote';
+import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import FolderIcon from '@mui/icons-material/Folder';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
@@ -65,6 +66,7 @@ const GROUPS: Group[] = [
     id: 'clinic', label: 'Clinic', icon: <HealthAndSafetyIcon fontSize="small" />, accent: '#40bfb9',
     items: [
       { to: '/appointments', label: 'Appointments', icon: <CalendarMonthIcon />, roles: STAFF, can: ['appointments:read'] },
+      { to: '/waiting-room', label: 'Waiting room', icon: <MeetingRoomIcon />, roles: STAFF, can: ['waiting:read'] },
       { to: '/patients', label: 'Patients', icon: <PeopleIcon />, roles: STAFF, can: ['patients:read'] },
       { to: '/treatment-offers', label: 'Treatment offers', icon: <AssignmentIcon />, roles: STAFF, can: ['offers:read'] },
       { to: '/lab-orders', label: 'Lab orders', icon: <ScienceIcon />, roles: STAFF, can: ['labs:read'] },

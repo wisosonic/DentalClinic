@@ -37,7 +37,7 @@ describe('side menu groups', () => {
     expect(groupNames(nav)).toEqual(['Clinic', 'Finance', 'Catalog', 'Administration']);
     const lists = within(nav).getAllByRole('generic', { hidden: true }).filter((e) => e.id.startsWith('nav-'));
     const links = (id: string) => within(lists.find((l) => l.id === `nav-${id}`)!).getAllByRole('link', { hidden: true }).map((l) => l.textContent);
-    expect(links('clinic')).toEqual(['Appointments', 'Patients', 'Treatment offers', 'Lab orders', 'Reports', 'Doctors', 'Clinics']);
+    expect(links('clinic')).toEqual(['Appointments', 'Waiting room', 'Patients', 'Treatment offers', 'Lab orders', 'Reports', 'Doctors', 'Clinics']);
     expect(links('finance')).toEqual(['Summary', 'Income tax', 'By doctor', 'Payments', 'Expenses', 'Commission']);
     expect(links('catalog')).toEqual(['Medications', 'Procedures', 'Labs', 'Suppliers']);
     expect(links('admin')).toEqual(['Deleted clinics’ data', 'Users', 'Roles', 'Trash', 'Activity log']);
@@ -54,7 +54,7 @@ describe('side menu groups', () => {
     const nav = await open();
     expect(groupNames(nav)).toEqual(['Clinic', 'Finance', 'Catalog']); // no administration: a specialist does not manage doctors
     const finance = within(nav).getAllByRole('link', { hidden: true }).map((l) => l.textContent);
-    expect(finance).toEqual(['Dashboard', 'Appointments', 'Patients', 'Treatment offers', 'Lab orders', 'Reports', 'By doctor', 'Payments', 'Commission', 'Medications']);
+    expect(finance).toEqual(['Dashboard', 'Appointments', 'Waiting room', 'Patients', 'Treatment offers', 'Lab orders', 'Reports', 'By doctor', 'Payments', 'Commission', 'Medications']);
   });
 
   it('folds a group away and opens it again, telling assistive technology which', async () => {
