@@ -10,10 +10,11 @@ import { fullName } from '../../lib/format';
 import { useAppointmentDialogs } from '../appointments/AppointmentDialogs';
 import { useGetConfigQuery, useGetPatientQuery, useGetTimelineQuery } from '../clinical/clinicalApi';
 import { DocumentsSection } from '../documents/DocumentsSection';
+import { FamilySection } from './FamilySection';
 import { Timeline } from '../visits/Timeline';
 
 /** The frame the patient's own pages share: the patient's name under the title, and a way back to the patient. */
-function PatientPageFrame({ title, actions, children }: { title: string; actions?: ReactNode; children: (patient: { id: number }) => ReactNode }) {
+function PatientPageFrame({ title, actions, children }: { title: string; actions?: ReactNode; children: (patient: { id: number; fname: string; lname: string }) => ReactNode }) {
   const { t } = useTranslation();
   const id = Number(useParams().id);
   const { data: patient, isLoading, error } = useGetPatientQuery(id, { skip: !Number.isInteger(id) });
@@ -51,6 +52,17 @@ export function PatientDocumentsPage() {
   return (
     <PatientPageFrame title={t('Documents')} actions={<Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>{t('Add documents')}</Button>}>
       {(p) => <DocumentsSection patientId={p.id} today={config?.today ?? ''} showTitle={false} adding={adding} onAddingChange={setAdding} />}
+    </PatientPageFrame>
+  );
+}
+
+/** The patient's family: who is linked to them, how, and a way to their pages. */
+export function PatientFamilyPage() {
+  const { t } = useTranslation();
+  const [adding, setAdding] = useState(false);
+  return (
+    <PatientPageFrame title={t('Family')} actions={<Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>{t('Link a family member')}</Button>}>
+      {(p) => <FamilySection patient={p} adding={adding} onAddingChange={setAdding} />}
     </PatientPageFrame>
   );
 }

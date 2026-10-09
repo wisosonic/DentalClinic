@@ -30,7 +30,7 @@ describe('the database dump', () => {
   it('writes the schema and every row to one file that opens on its own', async () => {
     const out = join(dir, 'backups', 'copy.sqlite');
     const result = await dumpDatabase(db, env(), out);
-    expect(result).toMatchObject({ file: out, tables: 38, uploadsDir: null }); // 36 tables + the migration bookkeeping
+    expect(result).toMatchObject({ file: out, tables: 39, uploadsDir: null }); // 36 tables + the migration bookkeeping
     expect(result.rows).toBeGreaterThanOrEqual(34); // 32 teeth, a user, the migration record
     const copy = new Database(out, { readonly: true });
     expect((copy.prepare('SELECT COUNT(*) AS n FROM teeth').get() as { n: number }).n).toBe(32);

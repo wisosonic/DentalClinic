@@ -66,6 +66,8 @@ export const TOAST_MESSAGES: Record<string, string> = {
   updateExpense: 'Expense saved',
   deleteExpense: 'Expense moved to the Trash',
   uploadDocument: 'Document added',
+  linkFamilyMember: 'Family member linked',
+  unlinkFamilyMember: 'Family link removed',
   updateDocument: 'Document saved',
   deleteDocument: 'Document moved to the Trash',
   createOffer: 'Treatment offer created',

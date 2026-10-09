@@ -3,6 +3,7 @@ import * as m001 from './migrations/001_initial_schema';
 import * as m002 from './migrations/002_document_patient_visibility';
 import * as m003 from './migrations/003_patient_usernames';
 import * as m004 from './migrations/004_waiting_room';
+import * as m005 from './migrations/005_patient_family';
 
 type Migration = { up(k: Knex): Promise<void>; down(k: Knex): Promise<void> };
 
@@ -14,6 +15,7 @@ const migrations: Record<string, Migration> = {
   '002_document_patient_visibility': m002,
   '003_patient_usernames': m003,
   '004_waiting_room': m004,
+  '005_patient_family': m005,
 };
 
 export const migrationNames = Object.keys(migrations).sort();

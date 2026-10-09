@@ -66,6 +66,16 @@ export interface PatientDto {
   createdAt: string | null;
 }
 
+/** How much each of the patient page's sections holds, for the badges on its buttons. Null: this person has no such section. */
+export interface PatientCountsDto {
+  appointments: number;
+  family: number;
+  /** Null for staff, who cannot browse payments. */
+  payments: number | null;
+  offers: number | null;
+  documents: number | null;
+}
+
 // ---------------------------------------------------------------------------
 // Doctors, clinics and dental units
 // ---------------------------------------------------------------------------

@@ -7,6 +7,7 @@ import type {
   CategoryDto,
   ChartToothDto,
   MedicationDto,
+  PatientCountsDto,
   PublicUser,
   ReportResponse,
   TimelineEntryDto,
@@ -237,6 +238,11 @@ export const clinicalApi = api.injectEndpoints({
       transformResponse: (r: { patient: PatientDto }) => r.patient,
       providesTags: (_r, _e, id) => [{ type: 'Patient', id }],
     }),
+    // How much each section of the patient page holds, for the badges on its buttons.
+    getPatientCounts: build.query<PatientCountsDto, number>({
+      query: (id) => `/patients/${id}/counts`,
+      providesTags: (_r, _e, id) => [{ type: 'Patient', id }, 'Appointment', 'Offer', 'Payment', 'Document', 'Family'],
+    }),
     createPatient: build.mutation<PatientDto, { body: Body; allowDuplicate?: boolean }>({
       query: ({ body, allowDuplicate }) => ({ url: '/patients', method: 'POST', body, ...(allowDuplicate ? { params: { allowDuplicate: 'true' } } : {}) }),
       transformResponse: (r: { patient: PatientDto }) => r.patient,
@@ -410,6 +416,7 @@ export const {
   useCreateResetLinkMutation,
   useListPatientsQuery,
   useGetPatientQuery,
+  useGetPatientCountsQuery,
   useCreatePatientMutation,
   useUpdatePatientMutation,
   useDeletePatientMutation,

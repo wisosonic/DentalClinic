@@ -10,6 +10,8 @@ import { assertPortalOn } from '../settings/operating';
 import { clinicLetterhead } from '../finance/letterhead';
 import { revokeAllForUser } from '../auth/session';
 import { renderPatientCard } from './card';
+import { patientCountsRouter } from './counts';
+import { familyRouter } from './family';
 import type { AppContext } from '../../context';
 import { sqlNow } from '../../db/connection';
 import { HttpError, badRequest, forbidden, notFound } from '../../lib/errors';
@@ -200,6 +202,9 @@ export function patientsRouter(ctx: AppContext): Router {
     await audit(ctx, req, { userId: user.id, action: 'patient.create', entity: 'patient', entityId: id });
     res.status(201).json({ patient: { ...toPatientDto((await find(id))!, user), loginState: 'none' } });
   });
+
+  router.use('/:id/family', familyRouter(ctx));
+  router.use('/:id/counts', patientCountsRouter(ctx));
 
   router.get('/:id', requirePermission('patients:read'), async (req, res) => {
     const user = requireUser(req);

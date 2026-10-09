@@ -42,7 +42,7 @@ export async function audit(ctx: AppContext, req: Request | null, entry: AuditEn
 /** The same person opening the same thing again within this time is one entry, not a flood. */
 const VIEW_WINDOW_MS = 10 * 60 * 1000;
 
-export type ViewKind = 'patient.view' | 'patient.timeline.view' | 'patient.chart.view' | 'patient.appointments.view' | 'appointment.view' | 'report.view' | 'lab_order.view' | 'offer.view' | 'document.view';
+export type ViewKind = 'patient.view' | 'patient.timeline.view' | 'patient.chart.view' | 'patient.family.view' | 'patient.appointments.view' | 'appointment.view' | 'report.view' | 'lab_order.view' | 'offer.view' | 'document.view';
 
 /**
  * Records that a member of the clinic opened a patient's record (read access). Everything is filed

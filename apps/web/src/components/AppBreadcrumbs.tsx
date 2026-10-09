@@ -52,7 +52,7 @@ const SETTINGS_SECTION_LABEL: Record<string, string> = { '/settings/general': 'G
 export function AppBreadcrumbs() {
   const { t } = useTranslation();
   const { pathname } = useLocation();
-  const patientMatch = /^\/patients\/(\d+)(?:\/(appointments|documents))?\/?$/.exec(pathname);
+  const patientMatch = /^\/patients\/(\d+)(?:\/(appointments|documents|family))?\/?$/.exec(pathname);
   const [search] = useSearchParams();
   const section = pathname.replace(/\/$/, '');
   // a patient's own pages, or a list filtered to the patient it was opened from
@@ -69,7 +69,7 @@ export function AppBreadcrumbs() {
     const name = patient ? fullName(patient) : t('Patient');
     const deeper = patientPage || filteredId;
     trail.push({ label: t('Patients'), to: '/patients' }, deeper ? { label: name, to: `/patients/${patientId}` } : { label: name });
-    if (patientPage) trail.push({ label: patientPage === 'documents' ? t('Documents') : t('Appointments and reports') });
+    if (patientPage) trail.push({ label: patientPage === 'documents' ? t('Documents') : patientPage === 'family' ? t('Family') : t('Appointments and reports') });
     else if (filteredId) trail.push({ label: t(SECTIONS[section]!) });
   } else if (settingsSection) {
     trail.push({ label: t('Settings'), to: '/settings' }, { label: t(settingsSection) });
