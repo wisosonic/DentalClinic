@@ -9,7 +9,7 @@ const api = useFakeApi();
 const CONFIG = { defaultDuration: 30, durationStep: 15, minDuration: 15, maxDuration: 480, cancelMinHours: 24, timezone: 'Asia/Beirut', today: '2026-10-05' };
 const doc = (extra: object = {}) => ({
   id: 1, patientId: 7, category: 'xray', title: 'Upper right', takenOn: '2026-10-01', note: null, fileName: 'scan.png', mime: 'image/png', sizeBytes: 2_500_000, isImage: true,
-  appointment: null, patientVisible: false, uploadedBy: { id: 4, name: 'Sam Staff' }, createdAt: '2026-10-01 09:00:00', canChange: true, ...extra,
+  appointment: null, patientVisible: false, uploadedBy: { id: 4, name: 'Sam Staff' }, createdAt: '2026-10-01 09:00:00', canChange: true, tags: [], commentCount: 0, annotationCount: 0, ...extra,
 });
 const pdfDoc = (extra: object = {}) => doc({ id: 2, category: 'blood_test', title: 'Blood results', mime: 'application/pdf', isImage: false, sizeBytes: 90_000, takenOn: '2026-09-20', ...extra });
 const list = (data: unknown[]) => json(200, { data, meta: { page: 1, pageSize: 200, total: data.length } });

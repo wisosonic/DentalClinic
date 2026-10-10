@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert, Box, Button, Checkbox, Chip, Dialog, DialogActions, DialogContent, DialogTitle, FormControlLabel, IconButton, InputAdornment, Link, MenuItem, Paper, Skeleton, Table, TableBody, TableCell,
   TableContainer, TableHead, TableRow, TextField, Tooltip, Typography,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
 import EditIcon from '@mui/icons-material/Edit';
 import ImageIcon from '@mui/icons-material/Image';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
@@ -21,6 +23,7 @@ import { useDebounce } from '../../lib/useDebounce';
 import { validate, type FieldErrors } from '../../lib/zodForm';
 import { useDeleteDocumentMutation, useListDocumentsQuery, useUpdateDocumentMutation } from './documentsApi';
 import { DOCUMENT_CATEGORY_LABEL } from './labels';
+import { DocumentViewerDialog } from './DocumentViewer';
 import { UploadDocumentsDialog } from './UploadDocumentsDialog';
 import { TimeText } from '../../lib/useTime';
 
@@ -86,32 +89,6 @@ function EditDocumentDialog({ doc, onClose }: { doc: PatientDocumentDto; onClose
   );
 }
 
-/** A picture, larger, with the previous and next picture of the list. */
-function ViewerDialog({ docs, index, onClose, onMove }: { docs: PatientDocumentDto[]; index: number; onClose: () => void; onMove: (index: number) => void }) {
-  const { t } = useTranslation();
-  const doc = docs[index]!;
-  return (
-    <Dialog open onClose={onClose} fullWidth maxWidth="lg">
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-        <Box sx={{ flexGrow: 1, minWidth: 0 }}>{doc.title}</Box>
-        <Chip size="small" label={t(DOCUMENT_CATEGORY_LABEL[doc.category])} />
-      </DialogTitle>
-      <DialogContent sx={{ textAlign: 'center' }}>
-        <Box component="img" src={fileUrl(doc)} alt={doc.title} sx={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }} />
-        {doc.note && <Typography variant="body2" sx={{ mt: 1, whiteSpace: 'pre-wrap' }}>{doc.note}</Typography>}
-      </DialogContent>
-      <DialogActions sx={{ flexWrap: 'wrap' }}>
-        <Button disabled={index === 0} onClick={() => onMove(index - 1)}>{t('Previous')}</Button>
-        <Typography variant="body2" color="text.secondary" sx={{ px: 1 }}>{index + 1} / {docs.length}</Typography>
-        <Button disabled={index === docs.length - 1} onClick={() => onMove(index + 1)}>{t('Next')}</Button>
-        <Box sx={{ flexGrow: 1 }} />
-        <Button component="a" href={fileUrl(doc)} target="_blank" rel="noopener" startIcon={<OpenInNewIcon />}>{t('Open in a new tab')}</Button>
-        <Button onClick={onClose}>{t('Close')}</Button>
-      </DialogActions>
-    </Dialog>
-  );
-}
-
 /**
  * A patient's documents (x-ray, panoramic, CBCT report, blood analysis, anything else): filter, open, add,
  * change and delete. Pictures open in a viewer, PDF files in a new tab. The uploader and admin change or delete.
@@ -121,10 +98,12 @@ export function DocumentsSection({
 }: { patientId: number; today: string; showTitle?: boolean; adding?: boolean; onAddingChange?: (adding: boolean) => void }) {
   const { t } = useTranslation();
   const [category, setCategory] = useState('');
+  const [tag, setTag] = useState('');
+  const [knownTags, setKnownTags] = useState<string[]>([]);
   const [search, setSearch] = useState('');
   const q = useDebounce(search.trim());
   const sort = useSort<SortKey>('taken', 'desc');
-  const { data, error, isFetching } = useListDocumentsQuery({ patientId, category: category || undefined, q: q || undefined });
+  const { data, error, isFetching } = useListDocumentsQuery({ patientId, category: category || undefined, q: q || undefined, tag: tag || undefined });
   const [remove, removeState] = useDeleteDocumentMutation();
   // The page may own the "Add documents" button (in its header, like Payments); on its own the section shows the button itself.
   const [addingInside, setAddingInside] = useState(false);
@@ -134,13 +113,18 @@ export function DocumentsSection({
   const [editing, setEditing] = useState<PatientDocumentDto | null>(null);
   const [deleting, setDeleting] = useState<PatientDocumentDto | null>(null);
   const [viewing, setViewing] = useState<number | null>(null);
+  // The tags seen so far, so the filter still lists them while it is narrowing the list.
+  useEffect(() => {
+    const seen = (data?.data ?? []).flatMap((d) => d.tags);
+    if (seen.length) setKnownTags((known) => [...new Set([...known, ...seen])].sort((x, y) => x.localeCompare(y)));
+  }, [data]);
 
   const value: Record<SortKey, (d: PatientDocumentDto) => string | number | null> = {
     title: (d) => d.title, kind: (d) => d.category, taken: (d) => d.takenOn, by: (d) => d.uploadedBy?.name ?? null, size: (d) => d.sizeBytes,
     visit: (d) => (d.appointment ? `${d.appointment.date} ${d.appointment.time}` : null),
   };
   const rows = sortRows(data?.data ?? [], value[sort.key], sort.order);
-  const pictures = rows.filter((d) => d.isImage);
+  const openAt = (d: PatientDocumentDto) => setViewing(rows.findIndex((r) => r.id === d.id));
 
   return (
     <Box component="section" aria-label={t('Documents')} sx={{ mb: 3 }}>
@@ -154,6 +138,12 @@ export function DocumentsSection({
           <MenuItem value="">{t('All')}</MenuItem>
           {DOCUMENT_CATEGORIES.map((c) => <MenuItem key={c} value={c}>{t(DOCUMENT_CATEGORY_LABEL[c])}</MenuItem>)}
         </TextField>
+        {knownTags.length > 0 && (
+          <TextField select label={t('Tag')} value={tag} onChange={(e) => setTag(e.target.value)} margin="none" size="small" sx={{ minWidth: 140 }}>
+            <MenuItem value="">{t('All')}</MenuItem>
+            {knownTags.map((x) => <MenuItem key={x} value={x}>{x}</MenuItem>)}
+          </TextField>
+        )}
         {!external && <Button variant="contained" startIcon={<AddIcon />} onClick={() => setAdding(true)}>{t('Add documents')}</Button>}
       </Box>
       {error != null && <Alert severity="error" sx={{ mb: 1 }}>{errorMessage(error)}</Alert>}
@@ -162,7 +152,7 @@ export function DocumentsSection({
       {!data && isFetching ? (
         <Skeleton variant="rounded" height={90} aria-label={t('Loading')} />
       ) : rows.length === 0 ? (
-        <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}><Typography color="text.secondary">{category || q ? t('No documents match.') : t('No documents yet.')}</Typography></Paper>
+        <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}><Typography color="text.secondary">{category || q || tag ? t('No documents match.') : t('No documents yet.')}</Typography></Paper>
       ) : (
         <TableContainer component={Paper} variant="outlined" sx={{ opacity: isFetching ? 0.6 : 1 }}>
           <Table size="small" aria-label={t('Documents')}>
@@ -182,14 +172,21 @@ export function DocumentsSection({
                 <TableRow key={d.id} hover>
                   <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
-                    <Preview doc={d} onOpen={() => setViewing(pictures.findIndex((p) => p.id === d.id))} />
+                    <Preview doc={d} onOpen={() => openAt(d)} />
                     <Box sx={{ minWidth: 0 }}>
                     {d.isImage ? (
-                      <Link component="button" type="button" underline="hover" onClick={() => setViewing(pictures.findIndex((p) => p.id === d.id))} sx={{ textAlign: 'start' }}>{d.title}</Link>
+                      <Link component="button" type="button" underline="hover" onClick={() => openAt(d)} sx={{ textAlign: 'start' }}>{d.title}</Link>
                     ) : (
                       <Link href={fileUrl(d)} target="_blank" rel="noopener" underline="hover">{d.title}</Link>
                     )}
                     {d.note && <Typography variant="caption" color="text.secondary" display="block">{d.note}</Typography>}
+                    {(d.tags.length > 0 || d.commentCount > 0 || d.annotationCount > 0) && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap', mt: 0.5 }}>
+                        {d.tags.map((x) => <Chip key={x} size="small" variant="outlined" label={x} onClick={() => setTag(x)} />)}
+                        {d.annotationCount > 0 && <Chip size="small" variant="outlined" icon={<PlaceOutlinedIcon />} label={d.annotationCount} aria-label={t('{{n}} marks on the picture', { n: d.annotationCount })} />}
+                        {d.commentCount > 0 && <Chip size="small" variant="outlined" icon={<ChatBubbleOutlineIcon />} label={d.commentCount} aria-label={t('{{n}} comments', { n: d.commentCount })} />}
+                      </Box>
+                    )}
                     {d.patientVisible && <Chip size="small" icon={<VisibilityIcon />} label={t('Visible to the patient')} sx={{ mt: 0.5 }} />}
                     </Box>
                     </Box>
@@ -200,10 +197,13 @@ export function DocumentsSection({
                   <TableCell>{d.uploadedBy?.name || '—'}</TableCell>
                   <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}><bdi dir="ltr">{formatBytes(d.sizeBytes)}</bdi></TableCell>
                   <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                    <Tooltip title={t('Comments, tags and marks')}>
+                      <IconButton size="small" aria-label={t('Comments, tags and marks of {{title}}', { title: d.title })} onClick={() => openAt(d)}><ChatBubbleOutlineIcon fontSize="small" /></IconButton>
+                    </Tooltip>
                     <Tooltip title={t('Open')}>
                       <IconButton
                         size="small" aria-label={t('Open {{title}}', { title: d.title })}
-                        {...(d.isImage ? { onClick: () => setViewing(pictures.findIndex((p) => p.id === d.id)) } : { component: 'a', href: fileUrl(d), target: '_blank', rel: 'noopener' })}
+                        {...(d.isImage ? { onClick: () => openAt(d) } : { component: 'a', href: fileUrl(d), target: '_blank', rel: 'noopener' })}
                       ><OpenInNewIcon fontSize="small" /></IconButton>
                     </Tooltip>
                     {d.canChange && (
@@ -222,7 +222,7 @@ export function DocumentsSection({
 
       <UploadDocumentsDialog open={adding} onClose={() => setAdding(false)} patientId={patientId} today={today} />
       {editing && <EditDocumentDialog doc={editing} onClose={() => setEditing(null)} />}
-      {viewing !== null && viewing >= 0 && pictures[viewing] && <ViewerDialog docs={pictures} index={viewing} onClose={() => setViewing(null)} onMove={setViewing} />}
+      {viewing !== null && viewing >= 0 && rows[viewing] && <DocumentViewerDialog docs={rows} index={viewing} onClose={() => setViewing(null)} onMove={setViewing} />}
       <ConfirmDialog
         open={!!deleting} destructive title={t('Delete this document?')}
         message={t('The document goes to the Trash. Only an administrator can restore it or erase it for good.')}

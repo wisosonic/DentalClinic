@@ -92,6 +92,9 @@ export async function erase(trx: Conn, f: Footprint): Promise<void> {
   await del('expenses', 'id', f.expenses);
   await del('offer_items', 'offer_id', f.offers);
   await del('lab_orders', 'id', f.labOrders);
+  await del('document_comments', 'document_id', f.documents);
+  await del('document_tags', 'document_id', f.documents);
+  await del('document_annotations', 'document_id', f.documents);
   await del('patient_documents', 'id', f.documents);
   // an item whose visit is erased can be booked again
   if (f.appointments.length) await trx('offer_items').whereIn('appointment_id', f.appointments).where({ status: 'scheduled' }).update({ status: 'pending', appointment_id: null });

@@ -5,7 +5,7 @@ import express, { Router, type Response } from 'express';
 import { z } from 'zod';
 import {
   DOCUMENT_MAX_BYTES, DOCUMENT_MAX_PER_PATIENT, DOCUMENT_MIME_TYPES, DOCUMENT_CATEGORIES, documentUpdateSchema, documentUploadSchema,
-  type Paginated, type PatientDocumentDto,
+  tagKey, type Paginated, type PatientDocumentDto,
 } from '@aya/shared';
 import type { AppContext } from '../../context';
 import { sqlNow } from '../../db/connection';
@@ -19,6 +19,7 @@ import { limiter } from '../../middleware/rateLimit';
 import { requireAuth, requirePermission, requireUser, type AuthUser } from '../../middleware/auth';
 import { operating } from '../settings/operating';
 import { audit, auditView } from '../audit/audit';
+import { mountDocumentNotes, noteSummaries } from './notes';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any -- DB row
 
@@ -26,6 +27,7 @@ const idParam = z.coerce.number().int().positive();
 const listQuery = z.object({
   category: z.enum(DOCUMENT_CATEGORIES).optional(),
   q: z.string().trim().max(100).optional(),
+  tag: z.string().trim().max(60).optional(),
 });
 
 /** What the server names a stored file; checked before any path is built from it. */
@@ -110,14 +112,18 @@ export function documentRouters(ctx: AppContext): { forPatient: Router; byId: Ro
       .whereNull('p.deleted_at')
       .select('d.*', 'p.doctor_id as p_doctor_id', 'u.name as u_name', 'a.date as a_date', 'a.time as a_time');
 
-  const toDto = (r: Row, user: AuthUser): PatientDocumentDto => ({
+  const toDto = (r: Row, user: AuthUser, notes: Awaited<ReturnType<typeof noteSummaries>>): PatientDocumentDto => ({
     id: r.id, patientId: r.patient_id, category: r.category, title: r.title, takenOn: r.taken_on ?? null, note: r.note ?? null,
     fileName: r.original_name, mime: r.mime, sizeBytes: r.size_bytes, isImage: String(r.mime).startsWith('image/'), patientVisible: !!r.patient_visible,
     appointment: r.appointment_id && r.a_date ? { id: r.appointment_id, date: r.a_date, time: r.a_time } : null,
     uploadedBy: r.uploaded_by ? { id: r.uploaded_by, name: r.u_name ?? '' } : null,
     createdAt: r.created_at ?? null,
     canChange: user.role === 'admin' || r.uploaded_by === user.id,
+    tags: notes.tags.get(r.id) ?? [], commentCount: notes.comments.get(r.id) ?? 0, annotationCount: notes.annotations.get(r.id) ?? 0,
   });
+
+  /** Documents with their tags and how many comments and marks each has. */
+  const dtos = async (rows: Row[], user: AuthUser) => { const notes = await noteSummaries(ctx, rows.map((r) => r.id)); return rows.map((r) => toDto(r, user, notes)); };
 
   /** A document this person may reach: its patient is not deleted and, for an external specialist, is his own. */
   async function load(user: AuthUser, id: number): Promise<Row> {
@@ -143,10 +149,11 @@ export function documentRouters(ctx: AppContext): { forPatient: Router; byId: Ro
       .modify((qb) => {
         if (q.category) qb.where('d.category', q.category);
         whereWords(qb, ['d.title', 'd.original_name', 'd.note'], q.q);
+        if (q.tag) qb.whereIn('d.id', db('document_tags').where({ tag_key: tagKey(q.tag) }).select('document_id'));
       })
       .orderBy([{ column: 'd.created_at', order: 'desc' }, { column: 'd.id', order: 'desc' }]);
     await auditView(ctx, req, { user, action: 'document.view', patientId });
-    const body: Paginated<PatientDocumentDto> = { data: rows.map((r) => toDto(r, user)), meta: { page: 1, pageSize: DOCUMENT_MAX_PER_PATIENT, total: rows.length } };
+    const body: Paginated<PatientDocumentDto> = { data: await dtos(rows, user), meta: { page: 1, pageSize: DOCUMENT_MAX_PER_PATIENT, total: rows.length } };
     res.json(body);
   });
 
@@ -194,7 +201,7 @@ export function documentRouters(ctx: AppContext): { forPatient: Router; byId: Ro
         throw err;
       }
       await audit(ctx, req, { userId: user.id, action: 'document.upload', entity: 'document', entityId: id!, diff: { patientId, category: input.category, bytes: body.length } });
-      res.status(201).json({ document: toDto(await query().where('d.id', id!).first(), user) });
+      res.status(201).json({ document: (await dtos([await query().where('d.id', id!).first()], user))[0] });
     },
   );
 
@@ -236,7 +243,7 @@ export function documentRouters(ctx: AppContext): { forPatient: Router; byId: Ro
       updated_at: sqlNow(),
     });
     await audit(ctx, req, { userId: user.id, action: 'document.update', entity: 'document', entityId: id, diff: { fields: Object.keys(input) } });
-    res.json({ document: toDto(await query().where('d.id', id).first(), user) });
+    res.json({ document: (await dtos([await query().where('d.id', id).first()], user))[0] });
   });
 
   // Soft delete: the document (and its file) goes to the Trash; only an admin restores it or erases it for good.
@@ -250,6 +257,8 @@ export function documentRouters(ctx: AppContext): { forPatient: Router; byId: Ro
     await audit(ctx, req, { userId: user.id, action: 'document.delete', entity: 'document', entityId: id, diff: { patientId: row.patient_id } });
     res.status(204).end();
   });
+
+  mountDocumentNotes(byId, ctx, load);
 
   return { forPatient, byId };
 }
