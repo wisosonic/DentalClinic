@@ -107,7 +107,7 @@ export function DashboardPage() {
         sx={{
           position: 'relative', overflow: 'hidden', color: '#fff', borderRadius: 1, p: { xs: 3, md: 4 }, mb: 3.5, background: BRAND.gradient,
           boxShadow: '0 18px 44px rgba(11,122,117,0.30)',
-          '&::after': { content: '""', position: 'absolute', width: 340, height: 340, borderRadius: '50%', insetInlineEnd: -90, top: -140, background: 'radial-gradient(circle, rgba(255,255,255,0.28), transparent 65%)' },
+          '&::after': { content: '""', position: 'absolute', width: 340, height: 340, borderRadius: '50%', insetInlineEnd: -90, top: -140, background: 'radial-gradient(circle, rgba(255,255,255,0.28), transparent 65%)', pointerEvents: 'none' },
         }}
       >
         <Box sx={{ position: 'relative', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2 }}>
