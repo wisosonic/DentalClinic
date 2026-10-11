@@ -106,7 +106,7 @@ function MoneyCharts({ data }: { data: DashboardChartsDto }) {
 
       <Card
         title={t('Biggest debts')} note={t('What patients still owe, as things stand today.')}
-        action={doctor || debts.length > 0 ? <Button component={RouterLink} to="/treatment-offers?debt=1" variant="outlined" size="small" sx={{ alignSelf: 'flex-start' }}>{t('Browse debts')}</Button> : undefined}
+        action={doctor || debts.length > 0 ? <Button component={RouterLink} to="/debts" variant="outlined" size="small" sx={{ alignSelf: 'flex-start' }}>{t('Browse debts')}</Button> : undefined}
       >
         {debts.length === 0 ? (
           <Empty>{t('Nobody owes anything.')}</Empty>

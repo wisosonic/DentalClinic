@@ -52,7 +52,7 @@ describe('dashboard insights: admin', () => {
     expect(link.fontWeight).toBe('600');
     expect(link.color).not.toBe('rgb(0, 0, 238)'); // not the browser's own blue
     expect(within(debts).getByText(formatMoney(600))).toBeInTheDocument();
-    expect(within(insights).getByRole('link', { name: 'Browse debts' })).toHaveAttribute('href', '/treatment-offers?debt=1');
+    expect(within(insights).getByRole('link', { name: 'Browse debts' })).toHaveAttribute('href', '/debts');
   });
 
   it('lets the month chart be read as a table', async () => {

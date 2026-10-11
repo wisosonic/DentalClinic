@@ -1,5 +1,5 @@
 import type {
-  CommissionPaymentDto, CommissionStatementDto, DirectoryEntryDto, ExpenseDto, DoctorFiguresResponse, FinanceSummaryDto, OpenOfferDto, Paginated, PaymentDto,
+  CommissionPaymentDto, CommissionStatementDto, DirectoryEntryDto, ExpenseDto, DebtsDto, DoctorFiguresResponse, FinanceSummaryDto, OpenOfferDto, Paginated, PaymentDto,
 } from '@aya/shared';
 import { api } from '../auth/authApi';
 
@@ -37,6 +37,11 @@ export const financeApi = api.injectEndpoints({
     financeSummary: build.query<FinanceSummaryDto, { from?: string; to?: string }>({
       query: (p) => ({ url: '/finance/summary', ...qs(p) }),
       providesTags: ['Payment', 'Expense', 'Offer'],
+    }),
+    // Everyone who still owes, as things stand today.
+    listDebts: build.query<DebtsDto, void>({
+      query: () => '/finance/debts',
+      providesTags: ['Payment', 'Offer', 'Patient'],
     }),
     doctorFigures: build.query<DoctorFiguresResponse, { from?: string; to?: string }>({
       query: (p) => ({ url: '/finance/doctors', ...qs(p) }),
@@ -124,6 +129,7 @@ export const financeApi = api.injectEndpoints({
 
 export const {
   useDoctorFiguresQuery,
+  useListDebtsQuery,
   useFinanceSummaryQuery,
   useListPaymentsQuery,
   useMyPaymentsQuery,

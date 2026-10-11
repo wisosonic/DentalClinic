@@ -116,7 +116,7 @@ describe('summary page', () => {
     expect(screen.getByRole('link', { name: 'Browse payments' })).toHaveAttribute('href', '/payments?from=2026-10-01&to=2026-10-15');
     expect(screen.getByRole('link', { name: 'Browse expenses' })).toHaveAttribute('href', '/expenses?from=2026-10-01&to=2026-10-15');
     expect(screen.getByRole('link', { name: 'Browse commission' })).toHaveAttribute('href', '/commission?from=2026-10-01&to=2026-10-15');
-    expect(screen.getByRole('link', { name: 'Browse debts' })).toHaveAttribute('href', '/treatment-offers?debt=1');
+    expect(screen.getByRole('link', { name: 'Browse debts' })).toHaveAttribute('href', '/debts');
     fireEvent.change(screen.getByLabelText('To'), { target: { value: '' } });
     await waitFor(() => expect(screen.getByRole('link', { name: 'Browse payments' })).toHaveAttribute('href', '/payments?from=2026-10-01'));
   });

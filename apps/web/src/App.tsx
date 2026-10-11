@@ -30,6 +30,7 @@ const PaymentsPage = lazy(() => import('./features/finance/PaymentsPage').then((
 const ExpensesPage = lazy(() => import('./features/finance/ExpensesPage').then((m) => ({ default: m.ExpensesPage })));
 const CommissionPage = lazy(() => import('./features/finance/CommissionPage').then((m) => ({ default: m.CommissionPage })));
 const SummaryPage = lazy(() => import('./features/finance/SummaryPage').then((m) => ({ default: m.SummaryPage })));
+const DebtsPage = lazy(() => import('./features/finance/DebtsPage').then((m) => ({ default: m.DebtsPage })));
 const DoctorFiguresPage = lazy(() => import('./features/finance/DoctorFiguresPage').then((m) => ({ default: m.DoctorFiguresPage })));
 const OffersPage = lazy(() => import('./features/offers/OffersPage').then((m) => ({ default: m.OffersPage })));
 const OfferDetailPage = lazy(() => import('./features/offers/OfferDetailPage').then((m) => ({ default: m.OfferDetailPage })));
@@ -118,6 +119,7 @@ export function App() {
           </Route>
 
           <Route element={<ProtectedRoute roles={['admin', 'doctor']} />}>
+            <Route path="/debts" element={<Suspense fallback={fallback}><DebtsPage /></Suspense>} />
             <Route path="/by-doctor" element={<Suspense fallback={fallback}><DoctorFiguresPage /></Suspense>} />
             <Route path="/commission" element={<Suspense fallback={fallback}><CommissionPage /></Suspense>} />
             <Route path="/medications" element={<Suspense fallback={fallback}><MedicationsPage /></Suspense>} />

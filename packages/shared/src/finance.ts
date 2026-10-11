@@ -203,6 +203,28 @@ export interface FinanceSummaryDto {
   };
 }
 
+/** One patient who owes money, with what they owe over their open (accepted) treatment offers. */
+export interface DebtRowDto {
+  patient: { id: number; fname: string; lname: string; phone: string };
+  /** The patient's primary doctor. */
+  doctor: { id: number; fname: string; lname: string } | null;
+  /** Open offers with a balance. */
+  offers: number;
+  price: number;
+  paid: number;
+  owed: number;
+  /** The day the oldest of those offers was made. */
+  since: string | null;
+  /** The day of the latest payment on those offers, or null when nothing was paid yet. */
+  lastPayment: string | null;
+}
+
+/** Everyone who still owes, as things stand today (not limited to a period). */
+export interface DebtsDto {
+  data: DebtRowDto[];
+  totals: { owed: number; patients: number; offers: number };
+}
+
 /** One doctor's money. A patient's doctor is his primary doctor; an admin sees every doctor, a doctor only himself. */
 export interface DoctorFiguresDto {
   doctor: { id: number; fname: string; lname: string; kind: 'owner' | 'external' };

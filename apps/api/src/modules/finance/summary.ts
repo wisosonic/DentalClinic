@@ -1,13 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { EXPENSE_TYPES, type DoctorFiguresDto, type ExpenseType, type FinanceSummaryDto } from '@aya/shared';
+import { EXPENSE_TYPES, type DebtRowDto, type DebtsDto, type DoctorFiguresDto, type ExpenseType, type FinanceSummaryDto } from '@aya/shared';
 import type { AppContext } from '../../context';
 import { requireAuth, requirePermission, requireRole, requireUser } from '../../middleware/auth';
 import { doctorIdFor } from '../visits/access';
 import { commissionStatement } from './commission';
 import { monthlyTotals } from './months';
-import { OWING, offerQuery } from '../offers/service';
-import { round2 } from './service';
+import { OWING, offerQuery, offerScope } from '../offers/service';
+import { limitToScope, round2 } from './service';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any -- DB row
 
@@ -135,6 +135,43 @@ export function summaryRouter(ctx: AppContext): Router {
         };
       }),
     };
+    res.json(body);
+  });
+
+  // Everyone who still owes: one row for each patient, from their open (accepted) offers with a balance, as things stand
+  // today. An admin sees every patient; a doctor only the patients whose primary doctor he is (staff have no payment access).
+  router.get('/debts', requireRole('admin', 'doctor'), requirePermission('payments:read'), async (req, res) => {
+    const user = requireUser(req);
+    const scope = await offerScope(db, user);
+    const owing: Row[] = await offerQuery(db).whereIn('q.status', OWING).modify((qb) => limitToScope(qb, scope)).orderBy('q.id');
+    const open = owing.filter((r) => round2(Number(r.price) - Number(r.paid)) > 0);
+    const last = new Map<number, string>();
+    if (open.length) {
+      const rows: Row[] = await db('payments').whereIn('offer_id', open.map((r) => r.id)).whereNull('deleted_at').where('type', 'clinic').groupBy('offer_id').select('offer_id').max({ day: 'date' });
+      for (const r of rows) last.set(r.offer_id, r.day);
+    }
+    const people = open.length ? new Map<number, Row>((await db('patients').whereIn('id', [...new Set(open.map((r) => r.patient_id))]).select('id', 'phone')).map((p: Row) => [p.id, p])) : new Map<number, Row>();
+    const perPatient = new Map<number, DebtRowDto>();
+    for (const r of open) {
+      const price = Number(r.price);
+      const paid = Number(r.paid);
+      const made = r.created_at ? String(r.created_at).slice(0, 10) : null;
+      const cur = perPatient.get(r.patient_id) ?? {
+        patient: { id: r.patient_id, fname: r.p_fname, lname: r.p_lname, phone: people.get(r.patient_id)?.phone ?? '' },
+        doctor: r.p_doctor_id ? { id: r.p_doctor_id, fname: r.d_fname, lname: r.d_lname } : null,
+        offers: 0, price: 0, paid: 0, owed: 0, since: null, lastPayment: null,
+      };
+      cur.offers += 1;
+      cur.price = round2(cur.price + price);
+      cur.paid = round2(cur.paid + paid);
+      cur.owed = round2(cur.owed + price - paid);
+      if (made && (!cur.since || made < cur.since)) cur.since = made;
+      const day = last.get(r.id);
+      if (day && (!cur.lastPayment || day > cur.lastPayment)) cur.lastPayment = day;
+      perPatient.set(r.patient_id, cur);
+    }
+    const data = [...perPatient.values()].sort((a, b) => b.owed - a.owed || a.patient.lname.localeCompare(b.patient.lname) || a.patient.id - b.patient.id);
+    const body: DebtsDto = { data, totals: { owed: round2(data.reduce((s, d) => s + d.owed, 0)), patients: data.length, offers: open.length } };
     res.json(body);
   });
 

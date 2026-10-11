@@ -149,7 +149,7 @@ export function SummaryPage() {
           <Tile
             icon={<AccountBalanceWalletIcon />} color="#7b1fa2" title={t('Patients’ debts')} value={formatMoney(data.debts.total)}
             note={t('{{patients}} owing, on {{offers}} treatment offers. As things stand today, whatever the dates above.', { patients: data.debts.patients, offers: data.debts.offers })}
-            action={<Button component={RouterLink} to="/treatment-offers?debt=1" variant="outlined" size="small">{t('Browse debts')}</Button>}
+            action={<Button component={RouterLink} to="/debts" variant="outlined" size="small">{t('Browse debts')}</Button>}
           >
             {data.debts.top.length > 0 && (
               <>

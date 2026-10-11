@@ -20,6 +20,7 @@ const SECTIONS: Record<string, string> = {
   '/summary': 'Summary',
   '/income-tax': 'Income tax',
   '/by-doctor': 'By doctor',
+  '/debts': 'Debts',
   '/payments': 'Payments',
   '/expenses': 'Expenses',
   '/commission': 'Commission',

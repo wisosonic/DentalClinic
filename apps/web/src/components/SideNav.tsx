@@ -6,6 +6,7 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Typography from '@mui/material/Typography';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import MeetingRoomIcon from '@mui/icons-material/MeetingRoom';
@@ -81,6 +82,7 @@ const GROUPS: Group[] = [
     items: [
       { to: '/summary', label: 'Summary', icon: <InsightsIcon />, roles: ['admin'] },
       { to: '/income-tax', label: 'Income tax', icon: <CalculateIcon />, roles: ['admin'] },
+      { to: '/debts', label: 'Debts', icon: <AccountBalanceWalletIcon />, roles: ['admin', 'doctor'], can: ['payments:read'] },
       { to: '/by-doctor', label: 'By doctor', icon: <GroupsIcon />, roles: ['admin', 'doctor'] },
       { to: '/payments', label: 'Payments', icon: <PaymentsIcon />, roles: STAFF, can: ['payments:read', 'payments:create'] },
       { to: '/expenses', label: 'Expenses', icon: <ReceiptLongIcon />, roles: ['admin', 'staff'], can: ['expenses:read'] },
