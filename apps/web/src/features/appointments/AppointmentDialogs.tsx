@@ -1,6 +1,6 @@
 import { useCallback, useState, type ReactNode } from 'react';
 import {
-  Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Stack, Typography,
+  Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Divider, Link, Stack, Typography,
 } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { Link as RouterLink } from 'react-router-dom';
@@ -126,7 +126,7 @@ function Detail({ id, onClose, onEdit }: { id: number; onClose: () => void; onEd
               <Typography variant="caption" color="text.secondary">{t('Patient')}</Typography>
               <Typography>
                 {staff && a.patientVisible ? (
-                  <RouterLink to={`/patients/${a.patientId}`} onClick={onClose}>{fullName(a.patient)}</RouterLink>
+                  <Link component={RouterLink} to={`/patients/${a.patientId}`} onClick={onClose} underline="hover" color="text.primary" sx={{ fontWeight: 600, '&:hover, &:focus-visible': { color: 'primary.main' } }}>{fullName(a.patient)}</Link>
                 ) : (
                   fullName(a.patient)
                 )}

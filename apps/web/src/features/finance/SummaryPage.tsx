@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Alert, Box, Button, Chip, Divider, List, ListItem, ListItemText, Paper, Skeleton, Stack, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, Divider, Link, List, ListItem, ListItemText, Paper, Skeleton, Stack, Typography } from '@mui/material';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong';
@@ -112,7 +112,7 @@ export function SummaryPage() {
             icon={<PaymentsIcon />} color="#2e7d32" title={t('Total payments')} value={formatMoney(data.payments.total)}
             note={data.payments.count === 1 ? t('1 payment received') : t('{{n}} payments received', { n: data.payments.count })}
             action={
-              <Stack direction="row" gap={1} flexWrap="wrap">
+              <Stack gap={1}>
                 <Button component={RouterLink} to={link('/payments')} variant="outlined" size="small">{t('Browse payments')}</Button>
                 {data.payments.byType.some((x) => x.type === 'commission') && (
                   <Button component={RouterLink} to={link('/commission')} variant="outlined" size="small">{t('Browse commission')}</Button>
@@ -157,7 +157,7 @@ export function SummaryPage() {
                 <List dense disablePadding aria-label={t('Biggest debts')}>
                   {data.debts.top.map((d) => (
                     <ListItem key={d.patient.id} disableGutters secondaryAction={<Typography fontWeight={700} dir="ltr">{formatMoney(d.owed)}</Typography>}>
-                      <ListItemText primary={<RouterLink to={`/patients/${d.patient.id}`}>{fullName(d.patient)}</RouterLink>} />
+                      <ListItemText primary={<Link component={RouterLink} to={`/patients/${d.patient.id}`} underline="hover" color="text.primary" sx={{ fontWeight: 600, '&:hover, &:focus-visible': { color: 'primary.main' } }}>{fullName(d.patient)}</Link>} />
                     </ListItem>
                   ))}
                 </List>
