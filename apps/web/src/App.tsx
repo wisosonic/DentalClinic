@@ -13,6 +13,7 @@ import { ResetPasswordPage } from './pages/ResetPasswordPage';
 
 // Each area loads on demand, so signing in stays fast.
 const PatientsPage = lazy(() => import('./features/patients/PatientsPage').then((m) => ({ default: m.PatientsPage })));
+const PatientMedicalPage = lazy(() => import('./features/patients/PatientSubPages').then((m) => ({ default: m.PatientMedicalPage })));
 const PatientFamilyPage = lazy(() => import('./features/patients/PatientSubPages').then((m) => ({ default: m.PatientFamilyPage })));
 const PatientDocumentsPage = lazy(() => import('./features/patients/PatientSubPages').then((m) => ({ default: m.PatientDocumentsPage })));
 const PatientAppointmentsPage = lazy(() => import('./features/patients/PatientSubPages').then((m) => ({ default: m.PatientAppointmentsPage })));
@@ -96,6 +97,7 @@ export function App() {
               <Route path="/patients" element={<Suspense fallback={fallback}><PatientsPage /></Suspense>} />
               <Route path="/patients/:id" element={<Suspense fallback={fallback}><PatientDetailPage /></Suspense>} />
               <Route path="/patients/:id/appointments" element={<Suspense fallback={fallback}><PatientAppointmentsPage /></Suspense>} />
+              <Route path="/patients/:id/medical" element={<Suspense fallback={fallback}><PatientMedicalPage /></Suspense>} />
               <Route path="/patients/:id/family" element={<Suspense fallback={fallback}><PatientFamilyPage /></Suspense>} />
               <Route path="/patients/:id/documents" element={<Suspense fallback={fallback}><PatientDocumentsPage /></Suspense>} />
               <Route path="/payments" element={<Suspense fallback={fallback}><PaymentsPage /></Suspense>} />

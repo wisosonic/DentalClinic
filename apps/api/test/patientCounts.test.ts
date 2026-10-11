@@ -20,7 +20,7 @@ beforeAll(async () => {
 });
 afterAll(() => t.destroy());
 beforeEach(async () => {
-  for (const table of ['payments', 'offer_items', 'treatment_offers', 'patient_documents', 'patient_relatives', 'appointments']) await t.db(table).del();
+  for (const table of ['payments', 'offer_items', 'treatment_offers', 'patient_documents', 'patient_relatives', 'patient_medical_items', 'appointments']) await t.db(table).del();
   const appt = (extra: object) => t.db('appointments').insert({ date: TOMORROW, time: '10:00', status: 'confirmed', patient_id: s.patientId, doctor_id: s.doctorId, clinic_id: s.clinicId, unit_id: s.unitId, duration_minutes: 30, ...stamp, ...extra });
   await appt({});
   await appt({ time: '11:00', status: 'cancelled' }); // a cancelled visit is still a visit in the history
@@ -36,6 +36,10 @@ beforeEach(async () => {
   const doc = (n: number, extra: object = {}) => t.db('patient_documents').insert({ patient_id: s.patientId, category: 'xray', title: `Scan ${n}`, file_name: `doc-${n}.png`, original_name: 'x.png', mime: 'image/png', size_bytes: 10, sha256: String(n).padEnd(64, '0'), ...stamp, ...extra });
   await doc(1);
   await doc(2, { deleted_at: '2026-10-01 00:00:00' });
+  await t.db('patient_medical_items').insert([
+    { patient_id: s.patientId, kind: 'allergy', name: 'Penicillin', active: true, ...stamp },
+    { patient_id: s.patientId, kind: 'condition', name: 'Asthma', active: false, ...stamp }, // resolved: not counted
+  ]);
   await t.db('patient_relatives').insert({ patient_id: s.patientId, relative_id: kin, relation: 'sibling', ...stamp });
 });
 
@@ -45,12 +49,12 @@ describe('GET /patients/:id/counts', () => {
   it('gives an admin every figure, leaving out what is in the Trash', async () => {
     const res = await counts(admin);
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ appointments: 2, family: 1, payments: 2, offers: 1, documents: 1 });
+    expect(res.body).toEqual({ appointments: 2, family: 1, payments: 2, offers: 1, documents: 1, medical: 1 });
   });
 
   it('gives the primary doctor the same, and staff everything but payments, which they cannot browse', async () => {
-    expect((await counts(aya)).body).toEqual({ appointments: 2, family: 1, payments: 2, offers: 1, documents: 1 });
-    expect((await counts(staff)).body).toEqual({ appointments: 2, family: 1, payments: null, offers: 1, documents: 1 });
+    expect((await counts(aya)).body).toEqual({ appointments: 2, family: 1, payments: 2, offers: 1, documents: 1, medical: 1 });
+    expect((await counts(staff)).body).toEqual({ appointments: 2, family: 1, payments: null, offers: 1, documents: 1, medical: 1 });
   });
 
   it('hides a relative who has been deleted from the family figure', async () => {
@@ -71,7 +75,7 @@ describe('GET /patients/:id/counts', () => {
   it('keeps an external specialist to his own patients', async () => {
     expect((await counts(ext)).status).toBe(404); // Pat is Aya's patient
     const mine = (await t.db('patients').insert({ patient_identifier: '3002', fname: 'My', lname: 'Own', phone: '7011', doctor_id: s.externalDoctorId, ...stamp }))[0]!;
-    expect((await counts(ext, mine)).body).toEqual({ appointments: 0, family: 0, payments: 0, offers: 0, documents: 0 });
+    expect((await counts(ext, mine)).body).toEqual({ appointments: 0, family: 0, payments: 0, offers: 0, documents: 0, medical: 0 });
   });
 
   it('answers 404 for an unknown or deleted patient, and refuses patients and anyone signed out', async () => {

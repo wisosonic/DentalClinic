@@ -9,7 +9,7 @@ import { assertBookable } from '../appointments/service';
 import { recalcOffer } from '../offers/service';
 import { audit } from '../audit/audit';
 import { countsOf, footprint, TRASH_TABLES, type TrashKind } from './purge';
-import { purgeItem } from './retention';
+import { eraseTrash, purgeItem, trashSummary } from './retention';
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any -- DB row
 
@@ -28,6 +28,7 @@ const listQuery = z.object({
 const TABLES = TRASH_TABLES;
 
 const purgeBody = z.object({ confirm: z.string().trim().max(200) });
+const emptyBody = z.object({ confirm: z.string().trim().max(20) });
 
 /**
  * The Trash: everything staff and doctors have deleted. Only an admin can see it, restore from it, or
@@ -101,6 +102,22 @@ export function trashRouter(ctx: AppContext): Router {
       })),
     ];
   }
+
+  // How much is in the Trash, for the warning before it is emptied.
+  router.get('/summary', requirePermission('trash:read'), async (_req, res) => {
+    res.json(await trashSummary(ctx));
+  });
+
+  // Erases everything in the Trash for good, after the word "empty" is typed. Each item goes with what is attached to it,
+  // exactly as when erased one by one; one that cannot be erased stays (and is counted). Only counts are logged, never content.
+  router.post('/empty', requirePermission('trash:delete'), async (req, res) => {
+    const user = requireUser(req);
+    const { confirm } = emptyBody.parse(req.body ?? {});
+    if (confirm.toLowerCase() !== 'empty') throw badRequest('CONFIRM_MISMATCH', 'Type the word empty to confirm');
+    const result = await eraseTrash(ctx, null);
+    await audit(ctx, req, { userId: user.id, action: 'trash.empty', diff: { erased: result.erased, failed: result.failed } });
+    res.json(result);
+  });
 
   router.get('/', requirePermission('trash:read'), async (req, res) => {
     const q = listQuery.parse(req.query);

@@ -11,6 +11,7 @@ import { clinicLetterhead } from '../finance/letterhead';
 import { revokeAllForUser } from '../auth/session';
 import { renderPatientCard } from './card';
 import { patientCountsRouter } from './counts';
+import { medicalRouter } from '../medical/router';
 import { familyRouter } from './family';
 import type { AppContext } from '../../context';
 import { sqlNow } from '../../db/connection';
@@ -205,6 +206,7 @@ export function patientsRouter(ctx: AppContext): Router {
 
   router.use('/:id/family', familyRouter(ctx));
   router.use('/:id/counts', patientCountsRouter(ctx));
+  router.use('/:id/medical', medicalRouter(ctx));
 
   router.get('/:id', requirePermission('patients:read'), async (req, res) => {
     const user = requireUser(req);

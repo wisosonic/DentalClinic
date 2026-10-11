@@ -74,6 +74,8 @@ export interface PatientCountsDto {
   payments: number | null;
   offers: number | null;
   documents: number | null;
+  /** Current allergies, conditions, medications and past surgeries recorded in the medical history. */
+  medical: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -381,6 +383,19 @@ export interface TrashItemDto {
 /** What erasing an item for good would remove. */
 export interface TrashImpactDto {
   counts: Record<'patients' | 'appointments' | 'reports' | 'reportToothNotes' | 'prescriptionLines' | 'offers' | 'payments' | 'expenses' | 'labOrders' | 'documents' | 'logins', number>;
+}
+
+/** What is in the Trash, by kind, for the "Empty the Trash" warning. */
+export interface TrashSummaryDto {
+  counts: Record<TrashItemDto['kind'], number>;
+  total: number;
+}
+
+/** What "Empty the Trash" did: how many of each kind were erased, and how many could not be (still in use). */
+export interface TrashEmptyResultDto {
+  erased: Partial<Record<TrashItemDto['kind'], number>>;
+  total: number;
+  failed: number;
 }
 
 /** What is left of deleted clinics: records that stay for the payment, commission and tax figures, read-only, for an admin to review or delete. */

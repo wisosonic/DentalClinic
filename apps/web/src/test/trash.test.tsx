@@ -148,3 +148,71 @@ describe('trash wording', () => {
     }
   });
 });
+
+describe('emptying the Trash', () => {
+  const SUMMARY = { counts: { patient: 1, appointment: 1, report: 1, offer: 0, payment: 0, commission: 0, expense: 0, lab_order: 0, document: 0 }, total: 3 };
+  const emptySetup = (summary: object = SUMMARY) => {
+    setup();
+    api.routes['GET /trash/summary'] = () => json(200, summary);
+  };
+
+  it('has a button, off when the Trash is empty', async () => {
+    emptySetup({ counts: {}, total: 0 });
+    renderApp(<App />, '/settings/trash');
+    await screen.findAllByText('Hicham Cheaib');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Empty the Trash' })).toBeDisabled());
+  });
+
+  it('shows how much is in it and needs the word empty before it erases everything', async () => {
+    emptySetup();
+    api.routes['POST /trash/empty'] = () => json(200, { erased: { patient: 1, appointment: 1, report: 1 }, total: 3, failed: 0 });
+    renderApp(<App />, '/settings/trash');
+    const open = await screen.findByRole('button', { name: 'Empty the Trash' });
+    await waitFor(() => expect(open).toBeEnabled());
+    await userEvent.click(open);
+    const dialog = await screen.findByRole('dialog', { name: 'Empty the Trash?' });
+    expect(await within(dialog).findByText(/3 items/)).toBeInTheDocument();
+    expect(within(dialog).getByText('Patients: 1')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Payments:/)).not.toBeInTheDocument(); // none of those: not listed
+    const go = within(dialog).getByRole('button', { name: 'Empty the Trash' });
+    expect(go).toBeDisabled();
+    await userEvent.type(within(dialog).getByLabelText('Confirmation'), 'empt');
+    expect(go).toBeDisabled();
+    await userEvent.type(within(dialog).getByLabelText('Confirmation'), 'y');
+    expect(go).toBeEnabled();
+    await userEvent.click(go);
+    await waitFor(() => expect(api.calls.find((c) => c.method === 'POST' && c.path === '/trash/empty')?.body).toEqual({ confirm: 'empty' }));
+    expect(await screen.findByText('Trash emptied')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('keeps the dialog open and says what was left when something could not be erased', async () => {
+    emptySetup();
+    api.routes['POST /trash/empty'] = () => json(200, { erased: { appointment: 2 }, total: 2, failed: 1 });
+    renderApp(<App />, '/settings/trash');
+    const open = await screen.findByRole('button', { name: 'Empty the Trash' });
+    await waitFor(() => expect(open).toBeEnabled());
+    await userEvent.click(open);
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText(/3 items/);
+    await userEvent.type(within(dialog).getByLabelText('Confirmation'), 'empty');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Empty the Trash' }));
+    expect(await within(dialog).findByText('Erased 2. 1 could not be erased and are still in the Trash.')).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('shows the server’s refusal', async () => {
+    emptySetup();
+    api.routes['POST /trash/empty'] = () => json(400, { error: { code: 'CONFIRM_MISMATCH', message: 'Type the word empty to confirm' } });
+    renderApp(<App />, '/settings/trash');
+    const open = await screen.findByRole('button', { name: 'Empty the Trash' });
+    await waitFor(() => expect(open).toBeEnabled());
+    await userEvent.click(open);
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByText(/3 items/);
+    await userEvent.type(within(dialog).getByLabelText('Confirmation'), 'EMPTY');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Empty the Trash' }));
+    expect(await within(dialog).findByText('Type the word empty to confirm')).toBeInTheDocument();
+  });
+});

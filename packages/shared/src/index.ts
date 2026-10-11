@@ -98,6 +98,7 @@ export interface Paginated<T> {
 
 export * from './clinical';
 export * from './family';
+export * from './medical';
 export * from './visits';
 export * from './finance';
 export * from './plans';

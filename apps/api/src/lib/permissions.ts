@@ -25,17 +25,17 @@ const DEFAULTS: Record<Role, Record<string, Action[]>> = {
     users: ALL, audit: ['read', 'delete'], patients: ALL, doctors: ALL, clinics: ALL, appointments: ALL,
     visits: ALL, teeth: R, categories: ALL, offers: ALL, payments: ALL, expenses: ALL,
     labs: ALL, suppliers: ALL, medications: ALL, documents: ALL, events: ALL, promotions: ALL,
-    notifications: ALL, reports: R, settings: ALL, trash: ALL, roles: ['read', 'update'], waiting: ALL,
+    notifications: ALL, reports: R, settings: ALL, trash: ALL, roles: ['read', 'update'], waiting: ALL, medical: ALL,
   },
   doctor: {
     patients: ALL, doctors: RW, clinics: R, appointments: ALL, visits: ALL, teeth: R,
     categories: R, offers: ALL, payments: ALL, labs: R, medications: RW, documents: ALL,
-    notifications: RW, reports: R, waiting: ['read', 'update'],
+    notifications: RW, reports: R, waiting: ['read', 'update'], medical: ALL,
   },
   staff: {
     patients: ALL, doctors: R, clinics: R, appointments: ALL, visits: ['read', 'delete'], teeth: R,
     categories: R, payments: ['create', 'update', 'delete'], expenses: ALL, labs: ALL, suppliers: ALL,
-    medications: R, offers: R, documents: ALL, events: RW, promotions: R, notifications: RW, reports: R, waiting: RW,
+    medications: R, offers: R, documents: ALL, events: RW, promotions: R, notifications: RW, reports: R, waiting: RW, medical: ALL,
   },
   patient: {
     patients: R, appointments: R, offers: R, payments: R,

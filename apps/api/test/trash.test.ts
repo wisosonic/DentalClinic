@@ -233,3 +233,85 @@ describe('erasing for good', () => {
     expect(await count('payments')).toBe(1);
   });
 });
+
+describe('emptying the Trash', () => {
+  const trashed = '2026-10-01 00:00:00';
+  const empty = (c: Client, confirm = 'empty') => c.post('/trash/empty', { confirm });
+
+  it('is the admin’s alone', async () => {
+    for (const c of [doctor, staff, patient]) {
+      expect((await empty(c)).status).toBe(403);
+      expect((await c.get('/trash/summary')).status).toBe(403);
+    }
+    expect([401, 403]).toContain((await t.client().post('/trash/empty', { confirm: 'empty' })).status);
+  });
+
+  it('counts what is in the Trash by kind', async () => {
+    await t.db('appointments').where({ id: apptId }).update({ deleted_at: trashed });
+    await t.db('expenses').insert({ date: TODAY, type: 'clinic', amount: 5, currency: '$', ...stamp, deleted_at: trashed });
+    const body = (await admin.get('/trash/summary')).body;
+    expect(body.counts).toMatchObject({ appointment: 1, expense: 1, patient: 0, payment: 0 });
+    expect(body.total).toBe(2);
+    await t.db('expenses').del();
+  });
+
+  it('needs the word empty, and erases nothing without it', async () => {
+    await t.db('appointments').where({ id: apptId }).update({ deleted_at: trashed });
+    for (const word of ['', 'yes', 'Pat Patient']) {
+      const res = await empty(admin, word);
+      expect(res.status, word).toBe(400);
+      expect(res.body.error.code).toBe('CONFIRM_MISMATCH');
+    }
+    expect(await count('appointments')).toBe(1);
+    expect((await empty(admin, '  EMPTY ')).status).toBe(200); // not case sensitive
+  });
+
+  it('erases everything in the Trash with what is attached, and leaves everything else', async () => {
+    const [live] = await t.db('expenses').insert({ date: TODAY, type: 'clinic', amount: 5, currency: '$', ...stamp });
+    await t.db('expenses').insert({ date: TODAY, type: 'clinic', amount: 7, currency: '$', ...stamp, deleted_at: trashed });
+    await t.db('appointments').where({ id: apptId }).update({ deleted_at: trashed }); // its report goes with it
+    const res = await empty(admin);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ erased: { expense: 1, appointment: 1 }, total: 2, failed: 0 });
+    expect(await count('appointments')).toBe(0);
+    expect(await count('reports')).toBe(0);
+    expect(await count('report_tooth')).toBe(0);
+    expect(await count('expenses')).toBe(1);
+    expect((await t.db('expenses').first('id')).id).toBe(live);
+    expect(await count('patients')).toBeGreaterThan(0); // the live patient, their offer and payment stay
+    expect(await count('treatment_offers')).toBe(1);
+    expect(await count('payments')).toBe(1);
+    expect((await admin.get('/trash/summary')).body.total).toBe(0);
+    expect(await empty(admin).then((r) => r.body)).toEqual({ erased: {}, total: 0, failed: 0 }); // nothing left: still fine
+  });
+
+  it('takes a deleted patient with their visits, offers and payments', async () => {
+    await del(staff, `/patients/${s.patientId}`);
+    const res = await empty(admin);
+    expect(res.body).toMatchObject({ erased: { patient: 1 }, failed: 0 });
+    expect(await count('appointments')).toBe(0);
+    expect(await count('treatment_offers')).toBe(0);
+    expect(await count('payments')).toBe(0);
+  });
+
+  it('leaves an item it cannot erase where it is, says so, and carries on', async () => {
+    await del(staff, `/patients/${s.patientId}`);
+    await t.db('expenses').insert({ date: TODAY, type: 'clinic', amount: 7, currency: '$', ...stamp, deleted_at: trashed });
+    await t.db.raw('CREATE TEMP TRIGGER block_patient_delete BEFORE DELETE ON patients BEGIN SELECT RAISE(ABORT, \'blocked\'); END;');
+    const res = await empty(admin);
+    await t.db.raw('DROP TRIGGER block_patient_delete');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ erased: { expense: 1 }, total: 1, failed: 1 });
+    expect(await count('appointments')).toBe(1); // the patient's records are all still there
+    expect((await admin.get('/trash/summary')).body.counts.patient).toBe(1);
+  });
+
+  it('records who emptied it and how much, never what', async () => {
+    await t.db('appointments').where({ id: apptId }).update({ deleted_at: trashed });
+    await empty(admin);
+    const entry = await t.db('audit_log').where({ action: 'trash.empty' }).first();
+    expect(JSON.parse(entry.diff)).toEqual({ erased: { appointment: 1 }, failed: 0 });
+    expect(entry.user_id).toBeTruthy();
+    for (const secret of ['Top secret', 'Pat Patient', '70111111']) expect(JSON.stringify(await t.db('audit_log'))).not.toContain(secret);
+  });
+});

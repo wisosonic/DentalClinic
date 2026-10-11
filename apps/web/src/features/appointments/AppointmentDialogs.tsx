@@ -10,6 +10,7 @@ import { StatusChip } from '../../components/StatusChip';
 import { useRole } from '../../components/useRole';
 import { errorMessage } from '../../lib/baseQuery';
 import { formatDate, fullName } from '../../lib/format';
+import { MedicalAlertBanner } from '../medical/MedicalAlertBanner';
 import {
   useAppointmentActionMutation, useDeleteAppointmentMutation, useDeleteReportMutation, useGetAppointmentQuery, useGetConfigQuery, useGetReportQuery,
 } from '../clinical/clinicalApi';
@@ -110,6 +111,7 @@ function Detail({ id, onClose, onEdit }: { id: number; onClose: () => void; onEd
             {errorMessage(actionError)}
           </Alert>
         )}
+        {a && staff && a.patientVisible && <MedicalAlertBanner patientId={a.patientId} onNavigate={onClose} compact />}
         {locked && <Alert severity="info" sx={{ mb: 2 }}>{t('This appointment belongs to a deleted clinic. It is kept for the records and can no longer be changed.')}</Alert>}
         {a && (
           <Stack spacing={1.5} divider={<Divider flexItem />}>

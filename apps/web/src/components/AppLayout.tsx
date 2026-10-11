@@ -2,6 +2,7 @@ import { useState } from 'react';
 import AppBar from '@mui/material/AppBar';
 import Avatar from '@mui/material/Avatar';
 import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
@@ -82,6 +83,7 @@ export function AppLayout() {
               <Typography variant="caption" color="text.secondary" dir="ltr" display="block">
                 {user?.email}
               </Typography>
+              {user?.role && <Chip size="small" label={t(user.role)} aria-label={t('Role: {{role}}', { role: t(user.role) })} sx={{ mt: 0.75, textTransform: 'capitalize' }} />}
             </Box>
             <Divider />
             <MenuItem

@@ -8,6 +8,8 @@ import type {
   ChartToothDto,
   MedicationDto,
   PatientCountsDto,
+  TrashEmptyResultDto,
+  TrashSummaryDto,
   PublicUser,
   ReportResponse,
   TimelineEntryDto,
@@ -200,6 +202,14 @@ export const clinicalApi = api.injectEndpoints({
     getTrashImpact: build.query<TrashImpactDto, { kind: string; id: number }>({
       query: ({ kind, id }) => `/trash/${kind}/${id}/impact`,
     }),
+    getTrashSummary: build.query<TrashSummaryDto, void>({
+      query: () => '/trash/summary',
+      providesTags: ['Trash'],
+    }),
+    emptyTrash: build.mutation<TrashEmptyResultDto, { confirm: string }>({
+      query: ({ confirm }) => ({ url: '/trash/empty', method: 'POST', body: { confirm } }),
+      invalidatesTags: ['Trash', 'Patient', 'Appointment', 'Report', 'Timeline', 'Offer', 'Payment', 'Expense', 'Commission', 'LabOrder', 'Document', 'Family', 'Waiting'],
+    }),
     restoreTrash: build.mutation<void, { kind: string; id: number }>({
       query: ({ kind, id }) => ({ url: `/trash/${kind}/${id}/restore`, method: 'POST', body: {} }),
       invalidatesTags: ['Trash', 'Patient', 'Appointment', 'Report', 'Timeline'],
@@ -241,7 +251,7 @@ export const clinicalApi = api.injectEndpoints({
     // How much each section of the patient page holds, for the badges on its buttons.
     getPatientCounts: build.query<PatientCountsDto, number>({
       query: (id) => `/patients/${id}/counts`,
-      providesTags: (_r, _e, id) => [{ type: 'Patient', id }, 'Appointment', 'Offer', 'Payment', 'Document', 'Family'],
+      providesTags: (_r, _e, id) => [{ type: 'Patient', id }, 'Appointment', 'Offer', 'Payment', 'Document', 'Family', 'Medical'],
     }),
     createPatient: build.mutation<PatientDto, { body: Body; allowDuplicate?: boolean }>({
       query: ({ body, allowDuplicate }) => ({ url: '/patients', method: 'POST', body, ...(allowDuplicate ? { params: { allowDuplicate: 'true' } } : {}) }),
@@ -410,6 +420,8 @@ export const {
   useGetTrashImpactQuery,
   useRestoreTrashMutation,
   usePurgeTrashMutation,
+  useGetTrashSummaryQuery,
+  useEmptyTrashMutation,
   useCreateUserMutation,
   useUpdateUserMutation,
   useResetUserPasswordMutation,

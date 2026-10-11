@@ -28,4 +28,12 @@ export const ENGLISH_ONLY: string[] = [
   "Prescription",
   "Dose",
   "Dose {{n}}",
+  "Allergies",
+  "Medical conditions",
+  "Current medications",
+  "Past surgeries",
+  "Add an allergy",
+  "Add a condition",
+  "Add a medication",
+  "Add a surgery",
 ];

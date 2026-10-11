@@ -3,6 +3,7 @@ import {
   Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, InputAdornment, MenuItem, Paper, Skeleton,
   Table, TableBody, TableCell, TableContainer, TableHead, TablePagination, TableRow, TextField, Tooltip, Typography,
 } from '@mui/material';
+import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import RestoreFromTrashIcon from '@mui/icons-material/RestoreFromTrash';
 import SearchIcon from '@mui/icons-material/Search';
@@ -13,7 +14,7 @@ import { SortCell, useSort } from '../../components/SortHead';
 import { errorMessage } from '../../lib/baseQuery';
 import { useDebounce } from '../../lib/useDebounce';
 import { dateLocale } from '../../i18n';
-import { useGetConfigQuery, useGetTrashImpactQuery, useListTrashQuery, usePurgeTrashMutation, useRestoreTrashMutation } from '../clinical/clinicalApi';
+import { useEmptyTrashMutation, useGetConfigQuery, useGetTrashImpactQuery, useGetTrashSummaryQuery, useListTrashQuery, usePurgeTrashMutation, useRestoreTrashMutation } from '../clinical/clinicalApi';
 
 const KIND_LABEL = { patient: 'Patient', appointment: 'Appointment', report: 'Visit report', offer: 'Treatment offer', payment: 'Payment', commission: 'Commission payment', expense: 'Expense', lab_order: 'Lab order', document: 'Document' } as const;
 
@@ -74,6 +75,64 @@ function EraseDialog({ item, onClose }: { item: TrashItemDto | null; onClose: ()
   );
 }
 
+/** What is in the Trash, by kind (English text is the translation key). */
+const KIND_LINES: [TrashItemDto['kind'], string][] = [
+  ['patient', 'Patients'], ['appointment', 'Appointments'], ['report', 'Visit reports'], ['offer', 'Treatment offers'], ['payment', 'Payments'],
+  ['commission', 'Commission payments'], ['expense', 'Expenses'], ['lab_order', 'Lab orders'], ['document', 'Documents'],
+];
+
+/** Erases everything in the Trash, after the word "empty" is typed. */
+function EmptyTrashDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
+  const { data } = useGetTrashSummaryQuery(undefined, { skip: !open });
+  const [empty, { isLoading, error, reset }] = useEmptyTrashMutation();
+  const [typed, setTyped] = useState('');
+  const [left, setLeft] = useState<{ erased: number; failed: number } | null>(null);
+  useEffect(() => { if (open) { setTyped(''); setLeft(null); reset(); } }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const matches = typed.trim().toLowerCase() === 'empty';
+
+  return (
+    <Dialog open={open} onClose={isLoading ? undefined : onClose} fullWidth maxWidth="sm">
+      <DialogTitle>{t('Empty the Trash?')}</DialogTitle>
+      <DialogContent>
+        {left ? (
+          <Alert severity="warning" role="status">{t('Erased {{n}}. {{failed}} could not be erased and are still in the Trash.', { n: left.erased, failed: left.failed })}</Alert>
+        ) : (
+          <>
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {t('This erases everything in the Trash for good ({{n}} items) and cannot be undone. A patient goes with their visits, offers, payments, documents and sign-in account.', { n: data?.total ?? 0 })}
+            </Alert>
+            {error != null && <Alert severity="error" sx={{ mb: 2 }} role="alert">{errorMessage(error)}</Alert>}
+            {!data ? <CircularProgress size={20} aria-label={t('Loading')} /> : (
+              <Box component="ul" sx={{ mt: 0, mb: 2, paddingInlineStart: 3 }}>
+                {KIND_LINES.filter(([kind]) => data.counts[kind] > 0).map(([kind, label]) => <li key={kind}>{t(label)}: {data.counts[kind]}</li>)}
+              </Box>
+            )}
+            <Typography variant="body2" sx={{ mb: 1 }}>{t('To confirm, type: {{text}}', { text: 'empty' })}</Typography>
+            <TextField label={t('Confirmation')} value={typed} onChange={(e) => setTyped(e.target.value)} margin="none" autoFocus autoComplete="off" />
+          </>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={isLoading}>{left ? t('Close') : t('Keep it')}</Button>
+        {!left && (
+          <Button
+            variant="contained" color="error" disabled={!matches || isLoading || !data || data.total === 0}
+            onClick={async () => {
+              const r = await empty({ confirm: typed.trim() });
+              if ('error' in r && r.error) return;
+              if (r.data.failed > 0) setLeft({ erased: r.data.total, failed: r.data.failed });
+              else onClose();
+            }}
+          >
+            {isLoading ? t('Erasing…') : t('Empty the Trash')}
+          </Button>
+        )}
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 type SortKey = 'deletedAt' | 'kind' | 'label' | 'deletedBy';
 
 /** Admin only: what staff and doctors deleted. Restore it, or erase it for good. */
@@ -86,6 +145,8 @@ export function TrashPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [erasing, setErasing] = useState<TrashItemDto | null>(null);
+  const [emptying, setEmptying] = useState(false);
+  const { data: summary } = useGetTrashSummaryQuery();
   const { data: config } = useGetConfigQuery();
   const { data, isFetching, error } = useListTrashQuery({
     page: page + 1, pageSize, kind: (kind || undefined) as TrashItemDto['kind'] | undefined, q: q || undefined, sort: sort.key, order: sort.order,
@@ -103,7 +164,9 @@ export function TrashPage() {
       <PageHeader
         title={t('Trash')}
         subtitle={t('Deleted by staff and doctors. Restore an item, or erase it for good: only you can.')}
+        actions={<Button color="error" variant="outlined" startIcon={<DeleteSweepIcon />} disabled={!summary || summary.total === 0} onClick={() => setEmptying(true)}>{t('Empty the Trash')}</Button>}
       />
+      <EmptyTrashDialog open={emptying} onClose={() => setEmptying(false)} />
       <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 2 }}>
         <TextField
           value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('Search the Trash')} margin="none" sx={{ maxWidth: 360 }}

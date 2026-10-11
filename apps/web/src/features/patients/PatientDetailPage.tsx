@@ -9,6 +9,7 @@ import AssignmentIcon from '@mui/icons-material/Assignment';
 import EventNoteIcon from '@mui/icons-material/EventNote';
 import FolderIcon from '@mui/icons-material/Folder';
 import FamilyRestroomIcon from '@mui/icons-material/FamilyRestroom';
+import MedicalInformationOutlinedIcon from '@mui/icons-material/MedicalInformationOutlined';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import ScienceIcon from '@mui/icons-material/Science';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +21,7 @@ import { errorMessage } from '../../lib/baseQuery';
 import { formatDate, fullName } from '../../lib/format';
 import { useAppointmentDialogs } from '../appointments/AppointmentDialogs';
 import { useDeletePatientMutation, useGetConfigQuery, useGetDoctorsQuery, useGetPatientCountsQuery, useGetPatientQuery } from '../clinical/clinicalApi';
+import { MedicalAlertBanner } from '../medical/MedicalAlertBanner';
 import { PatientChart } from '../visits/PatientChart';
 import { PatientCardDialog } from './PatientCardDialog';
 import { PatientFormDialog } from './PatientFormDialog';
@@ -92,6 +94,7 @@ export function PatientDetailPage() {
           <Stack direction="row" gap={1} flexWrap="wrap">
             <Button variant="contained" startIcon={<AddIcon />} onClick={() => openCreate({ patient })}>{t('Book appointment')}</Button>
             <Button component={RouterLink} to={`/patients/${patient.id}/appointments`} startIcon={<EventNoteIcon />} {...counted(t('Appointments and reports'), counts?.appointments)} />
+            {role !== 'patient' && <Button component={RouterLink} to={`/patients/${patient.id}/medical`} startIcon={<MedicalInformationOutlinedIcon />} {...counted(t('Medical history'), counts?.medical)} />}
             {role !== 'patient' && <Button component={RouterLink} to={`/patients/${patient.id}/family`} startIcon={<FamilyRestroomIcon />} {...counted(t('Family'), counts?.family)} />}
             {role !== 'patient' && <Button component={RouterLink} to={`/patients/${patient.id}/documents`} startIcon={<FolderIcon />} {...counted(t('Documents'), counts?.documents)} />}
             <Button component={RouterLink} to={`/treatment-offers?patientId=${patient.id}`} startIcon={<AssignmentIcon />} {...counted(t('Treatment offers'), counts?.offers)} />
@@ -109,6 +112,7 @@ export function PatientDetailPage() {
         }
       />
 
+      {role !== 'patient' && <MedicalAlertBanner patientId={patient.id} />}
       <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}>
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' }, gap: 2 }}>
           <Info label={t('Phone')}><bdi dir="ltr">{patient.phone}</bdi></Info>

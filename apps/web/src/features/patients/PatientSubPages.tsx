@@ -10,6 +10,7 @@ import { fullName } from '../../lib/format';
 import { useAppointmentDialogs } from '../appointments/AppointmentDialogs';
 import { useGetConfigQuery, useGetPatientQuery, useGetTimelineQuery } from '../clinical/clinicalApi';
 import { DocumentsSection } from '../documents/DocumentsSection';
+import { MedicalHistorySection } from '../medical/MedicalHistorySection';
 import { FamilySection } from './FamilySection';
 import { Timeline } from '../visits/Timeline';
 
@@ -54,6 +55,12 @@ export function PatientDocumentsPage() {
       {(p) => <DocumentsSection patientId={p.id} today={config?.today ?? ''} showTitle={false} adding={adding} onAddingChange={setAdding} />}
     </PatientPageFrame>
   );
+}
+
+/** The patient's medical history (profile, allergies, conditions, medications, surgeries), on a page of its own. */
+export function PatientMedicalPage() {
+  const { t } = useTranslation();
+  return <PatientPageFrame title={t('Medical history')}>{(p) => <MedicalHistorySection patientId={p.id} />}</PatientPageFrame>;
 }
 
 /** The patient's family: who is linked to them, how, and a way to their pages. */

@@ -42,11 +42,13 @@ export function patientCountsRouter(ctx: AppContext): Router {
       payments: null,
       offers: null,
       documents: null,
+      medical: null,
     };
     if (user.role !== 'staff' && can(user.role, 'payments:read')) {
       counts.payments = await total(paymentQuery(db).where('q.patient_id', id).modify((qb) => limitToScope(qb, money)));
     }
     if (can(user.role, 'offers:read')) counts.offers = await total(offerQuery(db).where('q.patient_id', id).modify((qb) => limitToScope(qb, offerAccess)));
+    if (can(user.role, 'medical:read')) counts.medical = Number((await db('patient_medical_items').where({ patient_id: id, active: true }).count({ n: '*' }).first())?.n ?? 0);
     if (can(user.role, 'documents:read')) {
       counts.documents = Number((await db('patient_documents').where({ patient_id: id }).whereNull('deleted_at').count({ n: '*' }).first())?.n ?? 0);
     }

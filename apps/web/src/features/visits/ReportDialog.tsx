@@ -10,6 +10,7 @@ import { MEDICATION_TIME_UNITS, SURFACES, prescriptionSchema, type MedicationDto
 import { DentalPanorama } from '../../components/DentalPanorama';
 import { errorMessage } from '../../lib/baseQuery';
 import { formatDate, fullName } from '../../lib/format';
+import { MedicalAlertBanner } from '../medical/MedicalAlertBanner';
 import { validate } from '../../lib/zodForm';
 import {
   useGetMedicationsQuery,
@@ -22,7 +23,7 @@ import {
 interface Props {
   open: boolean;
   onClose: () => void;
-  appointment: { id: number; date: string; patient: { fname: string; lname: string } };
+  appointment: { id: number; date: string; patient: { id?: number; fname: string; lname: string } };
   report: ReportDto | null;
 }
 
@@ -127,6 +128,7 @@ export function ReportDialog({ open, onClose, appointment, report }: Props) {
         <Typography variant="body2" color="text.secondary">{fullName(appointment.patient)} · {formatDate(appointment.date)}</Typography>
       </DialogTitle>
       <DialogContent dividers>
+        <MedicalAlertBanner patientId={appointment.patient.id} onNavigate={onClose} compact />
         {problem && <Alert severity="error" sx={{ mb: 2 }} role="alert">{problem}</Alert>}
 
         <Typography variant="subtitle1" component="h3" gutterBottom>{t('Summary')}</Typography>
